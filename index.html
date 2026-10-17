@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Web-PT · AI 物理治疗与康复体感游戏平台</title>
+
+<script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.6/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+<!-- Chart.js 数据可视化 -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<style>
+:root{
+  --primary:#10B981; --primary-strong:#059669; --primary-soft:#D1FAE5; --accent:#34D399;
+  --gold:#FBBF24; --bg:#F8FAFC; --surface:#FFFFFF; --ink:#0F172A; --ink-soft:#475569;
+  --line:#E2E8F0; --radius:24px;
+  --shadow:0 10px 30px -12px rgba(15,23,42,.15); --shadow-lg:0 24px 60px -20px rgba(16,185,129,.35);
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif;-webkit-font-smoothing:antialiased;line-height:1.6;overflow-x:hidden}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+#root{min-height:100vh}
+#input-video{position:fixed;left:-9999px;top:0;width:640px;height:480px;pointer-events:none}
+
+/* 首页 */
+.home{padding:48px 24px 80px;max-width:1180px;margin:0 auto}
+.home-hero{text-align:center;margin-bottom:52px}
+.badge{display:inline-flex;align-items:center;gap:8px;background:var(--primary-soft);color:var(--primary-strong);padding:8px 18px;border-radius:999px;font-size:14px;font-weight:600;letter-spacing:.02em;margin-bottom:22px}
+.badge .dot{width:8px;height:8px;border-radius:50%;background:var(--primary);animation:pulse 1.6s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+.home-hero h1{font-size:clamp(30px,5.5vw,54px);line-height:1.15;font-weight:800;letter-spacing:-.01em;margin-bottom:18px}
+.home-hero h1 .grad{background:linear-gradient(120deg,var(--primary) 0%,var(--accent) 55%,#0EA5E9 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.home-hero p.sub{color:var(--ink-soft);font-size:clamp(16px,2vw,19px);max-width:640px;margin:0 auto}
+.status-pill{margin-top:26px;display:inline-flex;align-items:center;gap:9px;padding:10px 18px;border-radius:14px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);font-size:14px;font-weight:600;color:var(--ink-soft)}
+.status-pill .s-dot{width:9px;height:9px;border-radius:50%;background:#CBD5E1}
+.status-pill.ready .s-dot{background:var(--primary);box-shadow:0 0 0 4px var(--primary-soft)}
+.status-pill.error .s-dot{background:#F59E0B}
+.status-pill.error{color:#B45309;border-color:#FDE68A}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:20px}
+.game-card{position:relative;background:var(--surface);border-radius:var(--radius);padding:26px 24px;border:1px solid var(--line);box-shadow:var(--shadow);transition:transform .25s cubic-bezier(.2,.8,.2,1),box-shadow .25s,border-color .25s;text-align:left;overflow:hidden;display:flex;flex-direction:column;gap:12px}
+.game-card::before{content:"";position:absolute;inset:0 0 auto 0;height:4px;background:linear-gradient(90deg,var(--primary),var(--accent));opacity:0;transition:opacity .25s}
+.game-card:hover{transform:translateY(-6px);box-shadow:var(--shadow-lg);border-color:var(--primary-soft)}
+.game-card:hover::before{opacity:1}
+.game-card:focus-visible{outline:3px solid var(--primary);outline-offset:2px}
+.game-card .ico{width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:30px;background:linear-gradient(135deg,var(--primary-soft),#ECFDF5);border:1px solid #A7F3D0}
+.game-card h3{font-size:19px;font-weight:700;letter-spacing:-.01em}
+.game-card .train{font-size:13px;color:var(--primary-strong);font-weight:700;background:var(--primary-soft);border-radius:8px;padding:3px 10px;display:inline-block;align-self:flex-start}
+.game-card p{color:var(--ink-soft);font-size:14px;flex:1}
+.game-card .meta{display:flex;justify-content:space-between;align-items:center;color:#94A3B8;font-size:12.5px;font-family:var(--mono)}
+.game-card .meta .best{color:var(--primary-strong);font-weight:700}
+.rec-btn{position:absolute;top:14px;right:14px;width:36px;height:36px;border-radius:11px;background:var(--bg);border:1px solid var(--line);font-size:17px;line-height:1;display:flex;align-items:center;justify-content:center;transition:.2s;color:#94A3B8}
+.rec-btn:hover{color:var(--primary-strong);border-color:var(--primary-soft);background:var(--primary-soft)}
+.rec-btn:focus-visible{outline:3px solid var(--primary);outline-offset:2px}
+
+/* 游戏页 */
+.game-page{min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px 16px 40px}
+.topbar{width:100%;max-width:1000px;display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.back-btn{display:inline-flex;align-items:center;gap:7px;padding:10px 16px;border-radius:14px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);font-weight:600;font-size:14px;color:var(--ink-soft);transition:.2s}
+.back-btn:hover{color:var(--primary-strong);border-color:var(--primary-soft)}
+.back-btn:focus-visible{outline:3px solid var(--primary);outline-offset:2px}
+.pause-btn{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:14px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);font-size:18px;color:var(--ink-soft);transition:.2s}
+.pause-btn:hover{color:var(--primary-strong);border-color:var(--primary-soft)}
+.topbar .title-wrap{flex:1;min-width:0}
+.topbar .title-wrap h2{font-size:18px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .title-wrap span{font-size:12.5px;color:var(--ink-soft)}
+.hud{display:flex;gap:10px;align-items:center}
+.hud .chip{min-width:70px;text-align:center;padding:9px 14px;border-radius:14px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow)}
+.hud .chip .k{font-size:11px;color:#94A3B8;font-weight:600;letter-spacing:.04em}
+.hud .chip .v{font-size:22px;font-weight:800;font-family:var(--mono);color:var(--ink)}
+.hud .chip.score .v{color:var(--primary-strong)}
+.stage{position:relative;width:100%;max-width:1000px;background:#020617;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-lg);border:1px solid #0F172A;aspect-ratio:4/3}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;padding:24px;z-index:5}
+.overlay.dark{background:rgba(2,6,23,.92)}
+.overlay.guide{background:linear-gradient(180deg,rgba(2,6,23,.68) 0%,rgba(2,6,23,0) 30%,rgba(2,6,23,0) 62%,rgba(2,6,23,.74) 100%)}
+.overlay.count{background:transparent;pointer-events:none}
+.countdown-num{font-family:var(--mono);font-size:80px;font-weight:800;color:var(--primary);line-height:1;text-shadow:0 0 30px rgba(16,185,129,.75),0 0 80px rgba(16,185,129,.5),0 2px 4px rgba(0,0,0,.6)}
+.overlay .big-title{font-size:clamp(22px,3.8vw,32px);font-weight:800;color:#fff;text-shadow:0 2px 16px rgba(0,0,0,.5)}
+.overlay .desc{color:var(--ink-soft);max-width:520px;font-size:15.5px}
+.overlay .score-final{font-family:var(--mono);font-size:60px;font-weight:800;color:var(--primary-strong)}
+.stars{font-size:46px;letter-spacing:6px;line-height:1;color:var(--gold);text-shadow:0 0 24px rgba(251,191,36,.5)}
+.stars .off{color:#334155;text-shadow:none}
+.new-record{font-size:15px;font-weight:800;color:var(--gold);background:rgba(251,191,36,.14);border:1px solid rgba(251,191,36,.4);padding:6px 16px;border-radius:999px}
+.rating-text{font-size:16px;font-weight:700;color:#D1FAE5}
+.primary-btn{display:inline-flex;align-items:center;gap:9px;padding:15px 34px;border-radius:16px;background:linear-gradient(135deg,var(--primary),var(--primary-strong));color:#fff;font-size:17px;font-weight:700;box-shadow:0 12px 28px -10px rgba(16,185,129,.55);transition:transform .18s,box-shadow .18s}
+.primary-btn:hover{transform:translateY(-2px);box-shadow:0 16px 34px -10px rgba(16,185,129,.65)}
+.primary-btn:active{transform:translateY(0)}
+.primary-btn:focus-visible{outline:3px solid var(--primary);outline-offset:2px}
+.ghost-btn{display:inline-flex;align-items:center;gap:8px;padding:13px 26px;border-radius:14px;background:var(--surface);border:1px solid var(--line);color:var(--ink-soft);font-weight:700;font-size:15px;transition:.2s}
+.ghost-btn:hover{border-color:var(--primary-soft);color:var(--primary-strong)}
+.diff-row{display:flex;gap:12px;justify-content:center}
+.diff-btn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:12px 26px;border-radius:16px;background:rgba(255,255,255,.9);border:2px solid transparent;font-weight:800;font-size:17px;color:var(--ink);transition:.2s;box-shadow:0 6px 18px -8px rgba(0,0,0,.4)}
+.diff-btn span{font-size:12px;color:var(--ink-soft);font-weight:600}
+.diff-btn.active{border-color:var(--primary);color:var(--primary-strong);background:#ECFDF5;box-shadow:0 8px 22px -8px rgba(16,185,129,.6)}
+.diff-btn:hover{border-color:var(--primary-soft)}
+.diff-btn:focus-visible{outline:3px solid var(--primary);outline-offset:2px}
+.no-person{color:#F87171;font-size:clamp(20px,3.4vw,30px);font-weight:800;letter-spacing:.02em}
+.no-person .warn{display:block;font-size:56px;margin-bottom:8px}
+.hint-tip{font-size:14px;color:#94A3B8;text-align:center;max-width:760px;margin-top:14px}
+.btn-row{display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
+
+/* 记录弹窗 */
+.modal-backdrop{position:fixed;inset:0;background:rgba(2,6,23,.55);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:20px;z-index:100;animation:fadeIn .18s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal{background:var(--surface);border-radius:24px;max-width:520px;width:100%;max-height:82vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 30px 80px -20px rgba(0,0,0,.5)}
+.modal-head{padding:22px 24px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+.modal-head .m-ico{width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,var(--primary-soft),#ECFDF5);border:1px solid #A7F3D0;display:flex;align-items:center;justify-content:center;font-size:24px}
+.modal-head h3{font-size:18px;font-weight:800;flex:1}
+.modal-close{width:34px;height:34px;border-radius:10px;background:var(--bg);border:1px solid var(--line);font-size:15px;color:var(--ink-soft);transition:.2s}
+.modal-close:hover{color:var(--primary-strong);border-color:var(--primary-soft)}
+.best-banner{margin:16px 24px 0;padding:18px;border-radius:16px;background:linear-gradient(135deg,#ECFDF5,#F0FDFA);border:1px solid #A7F3D0;display:flex;align-items:center;gap:14px}
+.best-banner .trophy{font-size:34px}
+.best-banner .bb-label{font-size:12px;color:var(--primary-strong);font-weight:700;letter-spacing:.04em}
+.best-banner .bb-score{font-size:30px;font-weight:800;font-family:var(--mono);color:var(--primary-strong);line-height:1.1}
+.best-banner .bb-meta{font-size:12px;color:var(--ink-soft)}
+.rec-list{overflow-y:auto;padding:14px 24px 22px;flex:1}
+.rec-item{display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px solid var(--line)}
+.rec-item:last-child{border-bottom:none}
+.rec-item .ri-stars{font-size:16px;color:var(--gold);min-width:64px;white-space:nowrap}
+.rec-item .ri-stars .off{color:#CBD5E1}
+.rec-item .ri-date{flex:1;color:var(--ink-soft);font-size:13.5px}
+.rec-item .ri-diff{font-size:11px;font-weight:700;padding:2px 9px;border-radius:7px;background:var(--bg);color:var(--ink-soft);border:1px solid var(--line)}
+.rec-item .ri-diff.hard{background:#FEF3C7;color:#B45309;border-color:#FDE68A}
+.rec-item .ri-score{font-family:var(--mono);font-weight:800;font-size:18px;color:var(--primary-strong)}
+.empty-rec{text-align:center;color:#94A3B8;padding:40px 0;font-size:14.5px}
+
+/* 导航 & 内容页 */
+.nav{position:sticky;top:0;z-index:50;background:rgba(248,250,252,.88);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.nav-inner{max-width:1180px;margin:0 auto;display:flex;align-items:center;gap:8px;padding:12px 24px}
+.nav-logo{font-size:18px;font-weight:800;cursor:pointer;color:var(--ink);white-space:nowrap}
+.nav-logo .pt{color:var(--primary-strong)}
+.nav-links{display:flex;gap:4px;margin-left:10px;flex-wrap:wrap}
+.nav-link{padding:8px 14px;border-radius:12px;font-size:14px;font-weight:600;color:var(--ink-soft);transition:.18s;white-space:nowrap}
+.nav-link:hover{color:var(--primary-strong);background:var(--primary-soft)}
+.nav-link.active{color:var(--primary-strong);background:var(--primary-soft)}
+.nav .status-pill.mini{margin:0 0 0 auto;padding:6px 12px;font-size:12px}
+.content-page{max-width:900px;margin:0 auto;padding:40px 24px 80px}
+.content-hero{margin-bottom:36px}
+.content-hero h1{font-size:clamp(26px,4vw,40px);font-weight:800;letter-spacing:-.01em;margin-bottom:12px}
+.content-hero p{color:var(--ink-soft);font-size:17px;max-width:680px}
+.section{margin-bottom:42px}
+.section h2{font-size:22px;font-weight:800;margin-bottom:16px;padding-left:14px;border-left:4px solid var(--primary);line-height:1.3}
+.section p{color:#334155;font-size:15.5px;line-height:1.85;margin-bottom:12px}
+.section ul{margin:6px 0 12px 4px;padding-left:0;list-style:none}
+.section ul li{position:relative;padding:6px 0 6px 26px;color:#334155;font-size:15px;line-height:1.75}
+.section ul li::before{content:"";position:absolute;left:4px;top:15px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.info-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:22px 24px;box-shadow:var(--shadow);margin:14px 0}
+.info-card h3{font-size:16px;font-weight:800;margin-bottom:8px;color:var(--primary-strong)}
+.table-wrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin:14px 0}
+table{width:100%;border-collapse:collapse;font-size:14px;min-width:620px}
+table th{background:#F1F5F9;text-align:left;padding:12px 16px;font-weight:700;color:var(--ink);border-bottom:1px solid var(--line);white-space:nowrap}
+table td{padding:11px 16px;border-bottom:1px solid #F1F5F9;color:#334155;vertical-align:top}
+table tr:last-child td{border-bottom:none}
+table td .lm{font-family:var(--mono);font-size:12.5px;color:var(--primary-strong);font-weight:700}
+.ref-group{margin-bottom:28px}
+.ref-group h3{font-size:16px;font-weight:800;color:var(--primary-strong);margin-bottom:12px;padding-left:12px;border-left:3px solid var(--accent)}
+.ref-item{display:flex;gap:14px;padding:16px 18px;background:var(--surface);border:1px solid var(--line);border-radius:16px;margin-bottom:12px;box-shadow:var(--shadow)}
+.ref-item .ref-idx{font-family:var(--mono);font-weight:800;color:var(--primary-strong);font-size:14px;min-width:24px}
+.ref-item .ref-body{flex:1}
+.ref-item .ref-title{font-weight:700;font-size:14.5px;color:var(--ink);line-height:1.5}
+.ref-item .ref-title a{color:inherit;text-decoration:none}
+.ref-item .ref-title a:hover{color:var(--primary-strong);text-decoration:underline}
+.ref-item .ref-src{font-size:12.5px;color:#94A3B8;margin-top:4px}
+.flow{display:flex;flex-direction:column;margin:16px 0}
+.flow-step{display:flex;align-items:stretch;gap:14px}
+.flow-step .fs-dot{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--primary),var(--primary-strong));color:#fff;font-weight:800;font-family:var(--mono);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.flow-step .fs-body{padding:9px 0 22px 16px;border-left:2px dashed var(--line);flex:1}
+.flow-step:last-child .fs-body{border-left-color:transparent;padding-bottom:0}
+.flow-step .fs-body span{font-size:14.5px;color:#334155}
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px}
+.legend .lg{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-soft)}
+.legend .lg .sw{width:12px;height:12px;border-radius:4px;display:inline-block}
+.keypoint-svg{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;margin:14px 0}
+
+@media (max-width:640px){
+  .home{padding:32px 14px 60px}
+  .hud .chip{min-width:58px;padding:7px 10px}
+  .hud .chip .v{font-size:18px}
+  .topbar h2{font-size:15px}
+  .countdown-num{font-size:60px}
+  .nav-inner{padding:10px 14px}
+  .nav-links{overflow-x:auto;flex-wrap:nowrap;margin-left:4px}
+  .nav .status-pill.mini{display:none}
+  .content-page{padding:28px 16px 60px}
+}
+
+/* ============ 首页数字墙 / 引导 / 页脚 / 仪表盘 / 架构图 ============ */
+.stat-wall{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;margin:26px 0 6px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px 26px;box-shadow:var(--shadow);min-width:116px;text-align:center}
+.stat .num{font-size:34px;font-weight:800;font-family:var(--mono);color:var(--primary-strong);line-height:1.1}
+.stat .label{font-size:13px;color:var(--ink-soft);margin-top:2px}
+.hero-cta{margin-top:22px;display:flex;gap:14px;justify-content:center;align-items:center}
+.rec-tag{position:absolute;top:14px;left:14px;font-size:11px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--gold),#F59E0B);padding:3px 10px;border-radius:999px;box-shadow:0 4px 10px -4px rgba(245,158,11,.6);z-index:2}
+.spinner{width:15px;height:15px;border:2px solid var(--primary-soft);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite;display:none;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.status-pill.loading .spinner{display:inline-block}
+.status-pill.loading .s-dot{background:transparent}
+
+.footer{border-top:1px solid var(--line);background:var(--surface);margin-top:24px}
+.footer-inner{max-width:1180px;margin:0 auto;padding:22px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;color:var(--ink-soft);font-size:13.5px}
+.footer .f-brand{font-weight:800;color:var(--ink);font-size:15px}
+.footer .f-meta{flex:1}
+.footer .f-author{font-weight:700;color:var(--primary-strong)}
+.footer .f-version{font-family:var(--mono);font-size:12.5px;color:#94A3B8}
+
+.dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;margin:18px 0}
+.dash-card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:var(--shadow);text-align:center}
+.dash-card .d-num{font-size:30px;font-weight:800;font-family:var(--mono);color:var(--primary-strong);line-height:1.1}
+.dash-card .d-label{font-size:13px;color:var(--ink-soft);margin-top:4px}
+.chart-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow);margin:18px 0}
+.chart-card h3{font-size:16px;font-weight:800;margin-bottom:14px;color:var(--ink)}
+.chart-box{position:relative;height:290px}
+.dash-empty{text-align:center;padding:70px 20px;color:var(--ink-soft);font-size:15.5px}
+
+.arch{margin:16px 0;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow)}
+.arch-layer{display:flex;align-items:center;gap:18px;padding:14px 16px;border-radius:16px;background:#F8FAFC;border:1px solid var(--line)}
+.arch-layer.infer{background:linear-gradient(135deg,#ECFDF5,#F0FDFA);border-color:#A7F3D0}
+.arch-label{font-size:13px;font-weight:800;color:var(--primary-strong);min-width:64px}
+.arch-boxes{display:flex;gap:10px;flex-wrap:wrap;flex:1}
+.arch-boxes span{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 14px;font-size:13.5px;font-weight:600;color:var(--ink);box-shadow:0 2px 6px -2px rgba(0,0,0,.08)}
+.arch-arrow{text-align:center;color:var(--primary);font-size:20px;line-height:1.3;padding:2px 0}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<video id="input-video" playsinline></video>
+
+<script type="text/babel" data-presets="react,env">
+const {useState,useEffect,useRef,useMemo} = React;
+
+/* =========================================================================
+ * 全局：姿态 & MediaPipe
+ * ========================================================================= */
+const W = 960, H = 720;
+let poseLandmarks=null, personDetected=false, poseInstance=null, cameraInstance=null, poseReady=false;
+const POSE_LINES=[[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28],[27,29],[29,31],[28,30],[30,32]];
+
+function mirrorX(lm){ return (1-lm.x)*W; }
+function lmPoint(idx){
+  if(!poseLandmarks) return null;
+  const p=poseLandmarks[idx];
+  if(!p || (p.visibility!=null && p.visibility<0.35)) return null;
+  return {x:mirrorX(p), y:p.y*H, v:p.visibility};
+}
+function readKeypoints(){
+  if(!poseLandmarks) return null;
+  const g=i=>lmPoint(i);
+  return {shL:g(11),shR:g(12),wrL:g(15),wrR:g(16),hipL:g(23),hipR:g(24),anL:g(27),anR:g(28)};
+}
+function mid(a,b){ return a&&b?{x:(a.x+b.x)/2,y:(a.y+b.y)/2}:null; }
+
+/* ---------- 视觉工具 ---------- */
+function hexRgba(hex,a){ const n=parseInt(hex.slice(1),16); return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`; }
+function roundRect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function drawStar(ctx,cx,cy,spikes,outer,inner,fill,stroke){ ctx.save(); ctx.shadowColor=fill; ctx.shadowBlur=18; ctx.beginPath(); let rot=-Math.PI/2; for(let i=0;i<spikes*2;i++){ const r=i%2===0?outer:inner; const a=rot+i*Math.PI/spikes; const x=cx+Math.cos(a)*r, y=cy+Math.sin(a)*r; if(i===0)ctx.moveTo(x,y); else ctx.lineTo(x,y); } ctx.closePath(); ctx.fillStyle=fill; ctx.fill(); ctx.shadowBlur=0; ctx.strokeStyle=stroke; ctx.lineWidth=2; ctx.stroke(); ctx.restore(); }
+function frostPanel(ctx,x,y,w,h,r=16){ ctx.save(); ctx.fillStyle='rgba(2,6,23,0.42)'; roundRect(ctx,x,y,w,h,r); ctx.fill(); ctx.strokeStyle='rgba(255,255,255,0.16)'; ctx.lineWidth=1.2; roundRect(ctx,x,y,w,h,r); ctx.stroke(); ctx.restore(); }
+function drawAmbient(ctx,t){
+  const spots=[
+    {x:W*0.18,y:H*0.22,r:250,sx:0.05,sy:0.04,ph:0.0,c:'rgba(16,185,129,0.055)'},
+    {x:W*0.82,y:H*0.30,r:270,sx:0.04,sy:0.06,ph:2.1,c:'rgba(34,211,238,0.045)'},
+    {x:W*0.30,y:H*0.78,r:230,sx:0.06,sy:0.03,ph:4.2,c:'rgba(52,211,153,0.05)'},
+    {x:W*0.70,y:H*0.72,r:210,sx:0.05,sy:0.05,ph:1.2,c:'rgba(16,185,129,0.04)'},
+    {x:W*0.50,y:H*0.50,r:310,sx:0.03,sy:0.03,ph:3.0,c:'rgba(110,231,183,0.03)'},
+  ];
+  for(const s of spots){ const x=s.x+Math.sin(t*s.sx+s.ph)*70, y=s.y+Math.cos(t*s.sy+s.ph)*60; const g=ctx.createRadialGradient(x,y,0,x,y,s.r); g.addColorStop(0,s.c); g.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=g; ctx.fillRect(x-s.r,y-s.r,s.r*2,s.r*2); }
+}
+
+/* ---------- 正向反馈：粒子 / 飘字 / 音效 ---------- */
+function burst(parts,x,y,color,n=22){ for(let i=0;i<n;i++){ const a=Math.random()*Math.PI*2, sp=60+Math.random()*220; parts.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-60,t:0,life:.55+Math.random()*.5,color,size:2.5+Math.random()*4.5}); } }
+function stepParticles(parts,dt){ for(const p of parts){ p.t+=dt; p.life-=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=260*dt; } for(let i=parts.length-1;i>=0;i--) if(parts[i].life<=0) parts.splice(i,1); }
+function drawParticles(ctx,parts){
+  for(const p of parts){
+    const a=Math.max(0,Math.min(1,p.life*1.7)), r=p.size*2.4;
+    const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r);
+    g.addColorStop(0,hexRgba(p.color,a)); g.addColorStop(0.5,hexRgba(p.color,a*0.45)); g.addColorStop(1,hexRgba(p.color,0));
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(p.x,p.y,r,0,6.2832); ctx.fill();
+    ctx.fillStyle=`rgba(255,255,255,${a*0.85})`; ctx.beginPath(); ctx.arc(p.x,p.y,p.size*0.5,0,6.2832); ctx.fill();
+  }
+}
+function addFloat(floats,x,y,text,color='#FDE047',size=22){ floats.push({x,y,text,color,size,t:0,life:0.9}); }
+function stepFloats(floats,dt){ for(const f of floats){ f.t+=dt; f.life-=dt; f.y-=46*dt; } for(let i=floats.length-1;i>=0;i--) if(floats[i].life<=0) floats.splice(i,1); }
+function drawFloats(ctx,floats){
+  for(const f of floats){
+    const a=Math.max(0,Math.min(1,f.life*1.6));
+    ctx.font=`800 ${f.size}px ui-monospace,Menlo,monospace`; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle=`rgba(0,0,0,${a*0.4})`; ctx.fillText(f.text,f.x+1.5,f.y+1.5);
+    ctx.fillStyle=hexRgba(f.color,a); ctx.fillText(f.text,f.x,f.y);
+    ctx.textBaseline='alphabetic';
+  }
+}
+// 连击里程碑：每 5 连击额外奖励并爆发
+function comboBonus(combo,floats,parts,x,y){ if(combo>0 && combo%5===0){ addFloat(floats,x,y-40,'COMBO ×'+combo+'! +10','#FDE047',30); burst(parts,x,y,'#34D399',42); chime(1240); } }
+// 失败惩罚：扣分(保底0) + 橙色飘字 + 低沉提示音
+function deduct(score,floats,x,y,amount,label){
+  addFloat(floats,x,y,label?`${label} -${amount}`:`-${amount}`,'#FB923C',20);
+  chime(200);
+  return Math.max(0,score-amount);
+}
+let audioCtx=null;
+function chime(freq=660){ try{ audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)(); const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type='sine'; o.frequency.value=freq; g.gain.setValueAtTime(0.11,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.0001,audioCtx.currentTime+0.24); o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+0.25); }catch(e){} }
+
+/* ---------- 摄像头 & 骨架 ---------- */
+function drawCamera(ctx,video){ if(!video||video.readyState<2) return; ctx.save(); ctx.globalAlpha=0.30; ctx.translate(W,0); ctx.scale(-1,1); ctx.drawImage(video,0,0,W,H); ctx.restore(); }
+function drawSkeleton(ctx){
+  if(!poseLandmarks) return;
+  const pts=[]; for(let i=0;i<33;i++){ const p=poseLandmarks[i]; if(p&&(p.visibility==null||p.visibility>0.35)) pts[i]={x:mirrorX(p),y:p.y*H}; else pts[i]=null; }
+  ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.strokeStyle='rgba(16,185,129,0.30)'; ctx.lineWidth=9;
+  for(const [a,b] of POSE_LINES){ if(pts[a]&&pts[b]){ ctx.beginPath(); ctx.moveTo(pts[a].x,pts[a].y); ctx.lineTo(pts[b].x,pts[b].y); ctx.stroke(); } }
+  ctx.strokeStyle='rgba(52,211,153,0.95)'; ctx.lineWidth=3.5;
+  for(const [a,b] of POSE_LINES){ if(pts[a]&&pts[b]){ ctx.beginPath(); ctx.moveTo(pts[a].x,pts[a].y); ctx.lineTo(pts[b].x,pts[b].y); ctx.stroke(); } }
+  for(const p of pts){ if(p){ ctx.fillStyle='rgba(52,211,153,0.95)'; ctx.beginPath(); ctx.arc(p.x,p.y,5,0,6.2832); ctx.fill(); ctx.fillStyle='rgba(6,95,70,0.9)'; ctx.beginPath(); ctx.arc(p.x,p.y,2,0,6.2832); ctx.fill(); } }
+}
+
+/* ---------- 姿势引导剪影 ---------- */
+function drawPoseGuide(ctx,guide,label){
+  if(!guide) return;
+  const cx=W/2, cy=H*0.54, sc=H*0.54;
+  const P=p=>[cx+(p.x-0.5)*sc, cy+(p.y-0.5)*sc];
+  const glow=ctx.createRadialGradient(cx,cy,20,cx,cy,sc*0.78); glow.addColorStop(0,'rgba(16,185,129,0.15)'); glow.addColorStop(1,'rgba(16,185,129,0)');
+  ctx.fillStyle=glow; ctx.fillRect(0,0,W,H);
+  ctx.save(); ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.shadowColor='rgba(52,211,153,0.85)'; ctx.shadowBlur=22;
+  ctx.strokeStyle='rgba(110,231,183,0.66)'; ctx.lineWidth=11;
+  const L=(a,b)=>{ const [x1,y1]=P(a),[x2,y2]=P(b); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); };
+  ctx.beginPath();
+  L(guide.shL,guide.shR); L(guide.shL,guide.elL); L(guide.elL,guide.wrL); L(guide.shR,guide.elR); L(guide.elR,guide.wrR);
+  L(guide.shL,guide.hipL); L(guide.shR,guide.hipR); L(guide.hipL,guide.hipR);
+  L(guide.hipL,guide.knL); L(guide.knL,guide.anL); L(guide.hipR,guide.knR); L(guide.knR,guide.anR);
+  const [hx,hy]=P(guide.head),[slx,sly]=P(guide.shL),[srx,sry]=P(guide.shR);
+  ctx.moveTo(hx,hy); ctx.lineTo((slx+srx)/2,(sly+sry)/2);
+  ctx.stroke(); ctx.shadowBlur=0;
+  ctx.fillStyle='rgba(167,243,208,0.9)';
+  for(const k of ['shL','shR','elL','elR','wrL','wrR','hipL','hipR','knL','knR','anL','anR']){ const [x,y]=P(guide[k]); ctx.beginPath(); ctx.arc(x,y,7,0,6.2832); ctx.fill(); }
+  const [hx2,hy2]=P(guide.head); ctx.fillStyle='rgba(167,243,208,0.95)'; ctx.beginPath(); ctx.arc(hx2,hy2,15,0,6.2832); ctx.fill();
+  ctx.restore();
+  if(label){ ctx.font='700 17px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif'; const tw=ctx.measureText(label).width; frostPanel(ctx,cx-tw/2-18,26,tw+36,40,20); ctx.fillStyle='#ECFDF5'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(label,cx,47); ctx.textBaseline='alphabetic'; }
+  ctx.fillStyle='rgba(148,163,184,0.92)'; ctx.font='600 15px ui-monospace,Menlo,monospace'; ctx.textAlign='center';
+  ctx.fillText('保持这个姿势 · 全身入镜', W/2, H-24);
+}
+
+/* ---------- 初始化 ---------- */
+function startPose(onState){
+  try{
+    const video=document.getElementById('input-video');
+    poseInstance=new Pose({locateFile:(f)=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`});
+    poseInstance.setOptions({modelComplexity:1,smoothLandmarks:true,enableSegmentation:false,minDetectionConfidence:0.5,minTrackingConfidence:0.5});
+    poseInstance.onResults((r)=>{ poseLandmarks=r.poseLandmarks||null; personDetected=!!poseLandmarks; });
+    cameraInstance=new Camera(video,{onFrame:async()=>{ if(poseInstance&&poseReady) await poseInstance.send({image:video}); },width:640,height:480});
+    cameraInstance.start().then(()=>{ poseReady=true; onState('ready'); }).catch(()=>onState('error'));
+  }catch(e){ onState('error'); }
+}
+
+/* =========================================================================
+ * 游戏记录
+ * ========================================================================= */
+const REC_KEY='webpt_records_v1';
+function loadRecords(){ try{ return JSON.parse(localStorage.getItem(REC_KEY))||{}; }catch(e){ return {}; } }
+function saveRecord(gameId,rec){ const all=loadRecords(); const list=all[gameId]||[]; list.push(rec); all[gameId]=list.slice(-40); try{ localStorage.setItem(REC_KEY,JSON.stringify(all)); }catch(e){} }
+function gameRecords(gameId){ return (loadRecords()[gameId]||[]).slice(); }
+function bestScore(gameId){ const list=gameRecords(gameId); if(!list.length) return null; return list.reduce((a,b)=>b.score>a.score?b:a); }
+function calcStars(game,score,difficulty){ const mult=difficulty==='hard'?1.5:1; let s=0; game.stars.forEach((line,i)=>{ if(score>=line*mult) s=i+1; }); return s; }
+const RATING_TEXT=['完成训练，继续加油','完成训练，很棒','很不错，继续保持','太棒了！康复表现优秀'];
+function fmtDate(ts){ const d=new Date(ts); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
+
+/* =========================================================================
+ * 十款游戏（修复刷分 + 趣味机制）
+ * ========================================================================= */
+
+/* 1. 农场接苹果 —— 金苹果(稀有×5) + 连击 */
+function makeAppleGame(diff){
+  const basket={w:150,h:34};
+  let apples=[], parts=[], floats=[], score=0, spawn=0.4, bx=W/2, combo=0;
+  const reset=()=>{ apples=[]; parts=[]; floats=[]; score=0; spawn=0.4; bx=W/2; combo=0; };
+  const update=(lms,dt)=>{
+    const k=readKeypoints(); const sh=mid(k&&k.shL,k&&k.shR);
+    if(sh) bx=Math.max(50,Math.min(W-50,sh.x));
+    spawn-=dt;
+    if(spawn<=0){ const golden=Math.random()<0.12; apples.push({x:40+Math.random()*(W-80),y:-34,r:golden?27:22,vy:(150+Math.random()*130)*diff,golden}); spawn=0.85/diff; }
+    for(const a of apples){
+      a.y+=a.vy*dt;
+      const basketY=H-92;
+      if(!a.caught && a.y+a.r>=basketY && a.y-a.r<=basketY+basket.h && Math.abs(a.x-bx)<basket.w/2){
+        a.caught=true; const val=a.golden?50:10;
+        score+=val; combo++;
+        addFloat(floats,a.x,a.y,'+'+val, a.golden?'#FDE047':'#A7F3D0', a.golden?30:22);
+        chime(a.golden?1040:720);
+        burst(parts,a.x,a.y, a.golden?'#FDE047':'#FBBF24', a.golden?36:20);
+        comboBonus(combo,floats,parts,bx,basketY-30);
+      }
+    }
+    for(const a of apples){ if(!a.caught && a.y>H+30){ combo=0; score=deduct(score,floats,a.x,H-30,5); } }
+    apples=apples.filter(a=>!a.caught && a.y<H+60);
+    stepParticles(parts,dt); stepFloats(floats,dt);
+  };
+  const draw=(ctx)=>{
+    const basketY=H-92;
+    ctx.fillStyle='rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(bx,basketY+34,80,14,0,0,6.2832); ctx.fill();
+    const bg=ctx.createLinearGradient(0,basketY,0,basketY+basket.h); bg.addColorStop(0,'#FBBF24'); bg.addColorStop(1,'#D97706');
+    ctx.fillStyle=bg; roundRect(ctx,bx-basket.w/2,basketY,basket.w,basket.h,12); ctx.fill();
+    ctx.strokeStyle='rgba(180,83,9,.6)'; ctx.lineWidth=2; roundRect(ctx,bx-basket.w/2,basketY,basket.w,basket.h,12); ctx.stroke();
+    for(const a of apples){
+      if(a.golden){ const g=ctx.createRadialGradient(a.x-a.r*.3,a.y-a.r*.3,2,a.x,a.y,a.r); g.addColorStop(0,'#FEF3C7'); g.addColorStop(1,'#F59E0B'); ctx.fillStyle=g; }
+      else { const ag=ctx.createRadialGradient(a.x-a.r*.35,a.y-a.r*.35,2,a.x,a.y,a.r); ag.addColorStop(0,'#FCA5A5'); ag.addColorStop(1,'#DC2626'); ctx.fillStyle=ag; }
+      ctx.beginPath(); ctx.arc(a.x,a.y,a.r,0,6.2832); ctx.fill();
+      ctx.fillStyle='#22C55E'; ctx.fillRect(a.x-2,a.y-a.r-8,4,9);
+      ctx.fillStyle='rgba(255,255,255,.6)'; ctx.beginPath(); ctx.arc(a.x-a.r*.3,a.y-a.r*.3,a.r*.26,0,6.2832); ctx.fill();
+    }
+    drawParticles(ctx,parts); drawFloats(ctx,floats);
+    if(combo>=2){ ctx.fillStyle='#FDE047'; ctx.font='800 20px ui-monospace,Menlo,monospace'; ctx.textAlign='center'; ctx.fillText('连击 ×'+combo,bx,40); }
+  };
+  return {reset,update,draw,getScore:()=>score};
+}
+
+/* 2. 击退飞球 —— 修复：球 3 次碰撞后爆炸消失(不再无限刷分) */
+function makeBallGame(diff){
+  const shieldR=46;
+  let balls=[], parts=[], floats=[], score=0, spawn=1.0;
+  const reset=()=>{ balls=[]; parts=[]; floats=[]; score=0; spawn=1.0; };
+  const update=(lms,dt)=>{
+    const k=readKeypoints();
+    spawn-=dt;
+    if(spawn<=0){ balls.push({x:W*0.5,y:H*0.4,r:20,vx:(Math.random()<.5?-1:1)*(150+Math.random()*120)*diff,vy:(Math.random()<.5?-1:1)*(150+Math.random()*120)*diff,hits:0,life:0}); spawn=1.15/diff; }
+    const shields=[]; if(k&&k.wrL)shields.push(k.wrL); if(k&&k.wrR)shields.push(k.wrR);
+    for(const b of balls){
+      b.x+=b.vx*dt; b.y+=b.vy*dt; b.life+=dt;
+      if(b.life>5){ b.dead=true; score=deduct(score,floats,b.x,b.y,3,'逃逸'); continue; }
+      if(b.x<b.r){b.x=b.r;b.vx*=-1;} if(b.x>W-b.r){b.x=W-b.r;b.vx*=-1;}
+      if(b.y<b.r){b.y=b.r;b.vy*=-1;} if(b.y>H-b.r){b.y=H-b.r;b.vy*=-1;}
+      for(const s of shields){
+        const dx=b.x-s.x, dy=b.y-s.y, d=Math.hypot(dx,dy);
+        if(d<b.r+shieldR){
+          const nx=dx/d, ny=dy/d; b.x=s.x+nx*(b.r+shieldR); b.y=s.y+ny*(b.r+shieldR);
+          const dot=b.vx*nx+b.vy*ny; b.vx-=2*dot*nx; b.vy-=2*dot*ny; b.vx*=1.22; b.vy*=1.22;
+          b.hits++;
+          if(b.hits>=3){ b.dead=true; score+=5; addFloat(floats,b.x,b.y,'BOOM! +5','#FDE047',32); chime(1240); burst(parts,b.x,b.y,'#FBBF24',46); }
+          else { score+=1; addFloat(floats,b.x,b.y,'+1','#A7F3D0',18); chime(880); burst(parts,b.x,b.y,'#34D399',14); }
+          break;
+        }
+      }
+    }
+    balls=balls.filter(b=>!b.dead);
+    stepParticles(parts,dt); stepFloats(floats,dt);
+  };
+  const draw=(ctx)=>{
+    for(const b of balls){
+      const halo=ctx.createRadialGradient(b.x,b.y,4,b.x,b.y,b.r*1.9); halo.addColorStop(0,'rgba(251,191,36,.4)'); halo.addColorStop(1,'rgba(251,191,36,0)');
+      ctx.fillStyle=halo; ctx.beginPath(); ctx.arc(b.x,b.y,b.r*1.9,0,6.2832); ctx.fill();
+      const g=ctx.createRadialGradient(b.x,b.y,2,b.x,b.y,b.r); g.addColorStop(0,'#FDE68A'); g.addColorStop(1,'#F59E0B');
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,6.2832); ctx.fill();
+      ctx.strokeStyle='rgba(255,255,255,.55)'; ctx.lineWidth=2; ctx.stroke();
+    }
+    const k=readKeypoints(); const shields=[]; if(k&&k.wrL)shields.push(k.wrL); if(k&&k.wrR)shields.push(k.wrR);
+    for(const s of shields){ const g=ctx.createRadialGradient(s.x,s.y,4,s.x,s.y,shieldR); g.addColorStop(0,'rgba(16,185,129,.95)'); g.addColorStop(1,'rgba(16,185,129,.12)'); ctx.fillStyle=g; ctx.beginPath(); ctx.arc(s.x,s.y,shieldR,0,6.2832); ctx.fill(); ctx.strokeStyle='#34D399'; ctx.lineWidth=3; ctx.stroke(); }
+    drawParticles(ctx,parts); drawFloats(ctx,floats);
+  };
+  return {reset,update,draw,getScore:()=>score};
+}
+
+/* 3. 深蹲躲障碍 —— 连击 + 多种飞鸟 */
+function makeSquatGame(diff){
+  let birds=[], parts=[], floats=[], score=0, spawn=1.4, combo=0; let cal=false, hipY0=0, legLen=1, shoulderY=0;
+  const reset=()=>{ birds=[]; parts=[]; floats=[]; score=0; spawn=1.2; combo=0; cal=false; };
+  const isSquat=(k)=>{
+    if(!cal){ if(k&&k.hipL&&k.hipR&&k.anL&&k.anR&&k.shL&&k.shR){ hipY0=(k.hipL.y+k.hipR.y)/2; const ankleY=(k.anL.y+k.anR.y)/2; shoulderY=(k.shL.y+k.shR.y)/2; legLen=Math.max(60,ankleY-hipY0); cal=true; } return false; }
+    if(!k||!k.hipL||!k.hipR) return false;
+    return ((k.hipL.y+k.hipR.y)/2-hipY0) > 0.15*legLen;
+  };
+  const update=(lms,dt)=>{
+    const k=readKeypoints(); const hip=mid(k&&k.hipL,k&&k.hipR); const px=hip?hip.x:W*0.4;
+    spawn-=dt;
+    if(spawn<=0){ const big=Math.random()<0.22; birds.push({x:W+40,y:0,r:big?40:26,spd:(220+Math.random()*60)*(big?0.8:1),passed:false,hit:false,big}); spawn=(1.6+Math.random()*0.5)/diff; }
+    for(const b of birds){
+      b.x-=b.spd*diff*dt;
+      b.y=(cal?shoulderY:H*0.32)-30+Math.sin(performance.now()/120)*8;
+      if(!b.passed && b.x<px){
+        b.passed=true;
+        if(isSquat(k)){ score+= b.big?20:10; combo++; addFloat(floats,b.x,b.y,'+'+(b.big?20:10),'#A7F3D0',22); chime(b.big?980:620); burst(parts,b.x,b.y,'#A7F3D0',b.big?30:22); b.hit=true; comboBonus(combo,floats,parts,b.x,b.y); }
+        else { combo=0; score=deduct(score,floats,b.x,b.y,5); }
+      }
+    }
+    birds=birds.filter(b=>b.x>-60); stepParticles(parts,dt); stepFloats(floats,dt);
+  };
+  const draw=(ctx)=>{
+    for(const b of birds){
+      if(b.hit) continue;
+      ctx.fillStyle='rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(b.x,b.y+18,30,7,0,0,6.2832); ctx.fill();
+      ctx.fillStyle=b.big?'#7C3AED':'#0EA5E9';
+      ctx.beginPath(); ctx.ellipse(b.x,b.y,b.r,b.r*0.47,0,0,6.2832); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(b.x+b.r*0.86,b.y-6,b.r*0.47,b.r*0.27,-0.4,0,6.2832); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(b.x-b.r*0.86,b.y-6,b.r*0.47,b.r*0.27,0.4,0,6.2832); ctx.fill();
+      ctx.fillStyle='#F59E0B'; ctx.beginPath(); ctx.arc(b.x+b.r*0.6,b.y-8,3,0,6.2832); ctx.fill();
+      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(b.x+b.r*0.27,b.y-4,2.5,0,6.2832); ctx.fill();
+      ctx.fillStyle='#0B1220'; ctx.beginPath(); ctx.arc(b.x+b.r*0.27,b.y-4,1.2,0,6.2832); ctx.fill();
+    }
+    drawParticles(ctx,parts); drawFloats(ctx,floats);
+    if(combo>=2){ ctx.fillStyle='#A7F3D0'; ctx.font='800 20px ui-monospace,Menlo,monospace'; ctx.textAlign='center'; ctx.fillText('连击 ×'+combo,W/2,40); }
+  };
+  return {reset,update,draw,getScore:()=>score};
+}
+
+/* 4. 原地跳绳 —— 连击加速 */
+function makeRopeGame(diff){
+  let score=0, parts=[], floats=[], angle=0, prevAngle=0, pendingJump=false, combo=0; let cal=false, anY0=0, cx=W/2, bodyH=260;
+  const reset=()=>{ score=0; parts=[]; floats=[]; angle=0; prevAngle=0; pendingJump=false; combo=0; cal=false; };
+  const update=(lms,dt)=>{
+    const k=readKeypoints(); const an=mid(k&&k.anL,k&&k.anR); const hip=mid(k&&k.hipL,k&&k.hipR);
+    if(!cal){ if(an&&hip){ anY0=an.y; bodyH=Math.max(160,an.y-hip.y+150); cx=an.x; cal=true; } return; }
+    if(an) cx=an.x;
+    const pivotY=Math.max(80,anY0-bodyH), R=anY0-pivotY;
+    if(an && an.y<anY0-45) pendingJump=true;
+    const speed=(2*Math.PI/1.2)*(1+Math.min(combo,30)*0.015);
+    prevAngle=angle; angle+=speed*dt;
+    const bottomCross=Math.floor(prevAngle/(2*Math.PI))!==Math.floor(angle/(2*Math.PI));
+    if(bottomCross){
+      if(pendingJump){ score+=10; combo++; addFloat(floats,cx,anY0-40,'+10','#A7F3D0',22); chime(760); burst(parts,cx,anY0,'#34D399',20); comboBonus(combo,floats,parts,cx,anY0-60); }
+      else { combo=0; score=deduct(score,floats,cx,anY0-40,5); }
+      pendingJump=false;
+    }
+    stepParticles(parts,dt); stepFloats(floats,dt);
+  };
+  const draw=(ctx)=>{
+    if(!cal) return;
+    const pivotY=Math.max(80,anY0-bodyH), R=anY0-pivotY;
+    const ex=cx+Math.sin(angle)*R*0.9, ey=pivotY+Math.cos(angle)*R;
+    ctx.strokeStyle='rgba(255,255,255,.28)'; ctx.lineWidth=9; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(cx,pivotY); ctx.quadraticCurveTo(cx+Math.sin(angle)*R*0.45,pivotY+Math.cos(angle)*R*0.55,ex,ey); ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,.9)'; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(cx,pivotY); ctx.quadraticCurveTo(cx+Math.sin(angle)*R*0.45,pivotY+Math.cos(angle)*R*0.55,ex,ey); ctx.stroke();
+    ctx.fillStyle='#F59E0B'; ctx.beginPath(); ctx.arc(ex,ey,6,0,6.2832); ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,.16)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(cx-160,anY0+12); ctx.lineTo(cx+160,anY0+12); ctx.stroke();
+    drawParticles(ctx,parts); drawFloats(ctx,floats);
+    if(combo>=2){ ctx.fillStyle='#A7F3D0'; ctx.font='800 20px ui-monospace,Menlo,monospace'; ctx.textAlign='center'; ctx.fillText('连击 ×'+combo+' · 加速中',W/2,40); }
+  };
+  return {reset,update,draw,getScore:()=>score};
+}
+
+/* 5. 虚拟擦玻璃 —— 污渍渐淡 + 飘字 */
+function makeGlassGame(diff){
+  const cols=12, rows=9, cw=W/cols, ch=H/rows;
+  let tiles=[], parts=[], floats=[], score=0, total=0, cleared=0, regrowTimer=0;
+  const reset=()=>{ tiles=[]; parts=[]; floats=[]; score=0; cleared=0; total=0; regrowTimer=0; for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){ tiles.push({cx:c*cw+cw/2,cy:r*ch+ch/2,clean:false,alpha:1}); total++; } };
+  const update=(lms,dt)=>{
+    const k=readKeypoints(); const hands=[]; if(k&&k.wrL)hands.push(k.wrL); if(k&&k.wrR)hands.push(k.wrR);
+    for(const h of hands){
+      for(const t of tiles){
+        if(t.clean) continue;
+        if(Math.hypot(h.x-t.cx,h.y-t.cy)<cw*0.62){
+          t.alpha-=dt*2.6;
+          if(t.alpha<=0){ t.clean=true; cleared++; score+=2; addFloat(floats,t.cx,t.cy,'+2','#93C5FD',15); burst(parts,t.cx,t.cy,'#60A5FA',8); if(cleared%10===0) chime(700); }
+        }
+      }
+    }
+    regrowTimer+=dt;
+    if(regrowTimer>4 && cleared<total){ regrowTimer=0; const cleanTiles=tiles.filter(t=>t.clean); if(cleanTiles.length){ const t=cleanTiles[Math.floor(Math.random()*cleanTiles.length)]; t.clean=false; t.alpha=1; cleared--; score=deduct(score,floats,t.cx,t.cy,2,'回潮'); } }
+    stepParticles(parts,dt); stepFloats(floats,dt);
+  };
+  const draw=(ctx)=>{
+    for(const t of tiles){
+      if(t.clean) continue;
+      const d=Math.min(1,Math.hypot(W/2-t.cx,H/2-t.cy)/(W*0.6));
+      ctx.fillStyle=`rgba(148,163,184,${(0.20+0.42*d)*t.alpha})`;
+      roundRect(ctx,t.cx-cw*0.44,t.cy-ch*0.44,cw*0.88,ch*0.88,6); ctx.fill();
+      if(t.alpha<1){ ctx.strokeStyle='rgba(96,165,250,0.5)'; ctx.lineWidth=1; roundRect(ctx,t.cx-cw*0.44,t.cy-ch*0.44,cw*0.88,ch*0.88,6); ctx.stroke(); }
+    }
+    const pct=cleared/total;
+    frostPanel(ctx,W/2-210,22,420,18,9);
+    ctx.fillStyle='rgba(255,255,255,.14)'; roundRect(ctx,W/2-200,28,400,10,5); ctx.fill();
+    const grd=ctx.createLinearGradient(W/2-200,0,W/2+200,0); grd.addColorStop(0,'#38BDF8'); grd.addColorStop(1,'#60A5FA');
+    ctx.fillStyle=grd; roundRect(ctx,W/2-200,28,400*pct,10,5); ctx.fill();
+    ctx.fillStyle='#E0F2FE'; ctx.font='700 15px ui-monospace,Menlo,monospace'; ctx.textAlign='center'; ctx.fillText(`擦除进度 ${Math.round(pct*100)}%`,W/2,60);
+    drawParticles(ctx,parts); drawFloats(ctx,floats);
+  };
+  return {reset,update,draw,getScore:()=>score, win:()=>cleared/total>=0.8};
+}
+
+/* 6. 高空走钢丝 —— 修复：必须单腿站立(一脚离地)才计分 */
+function makeBalanceGame(diff){
+  let samples=[], score=0, parts=[], floats=[], tilt=0, lastReward=0, onOneLeg=false, prevOneLeg=false;
+  const reset=()=>{ samples=[]; score=0; parts=[]; floats=[]; tilt=0; lastReward=0; onOneLeg=false; prevOneLeg=false; };
+  const update=(lms,dt,now,elapsed)=>{
+    const k=readKeypoints(); const hip=mid(k&&k.hipL,k&&k.hipR);
+    if(!hip) return;
+    const nowOneLeg = k&&k.anL&&k.anR ? Math.abs(k.anL.y-k.anR.y) > 70 : false;
+    if(prevOneLeg && !nowOneLeg){ score=deduct(score,floats,hip.x,hip.y-40,5,'落地'); }
+    onOneLeg=nowOneLeg; prevOneLeg=nowOneLeg;
+    samples.push({t:elapsed,x:hip.x}); while(samples.length&&elapsed-samples[0].t>3) samples.shift();
+    const xs=samples.map(s=>s.x); const range=Math.max(...xs)-Math.min(...xs);
+    const thresh=55/diff; const stable=range<thresh;
+    tilt=Math.min(1,Math.max(0,(range-thresh)/140));
+    if(onOneLeg && stable && elapsed-lastReward>0.5){ score+=5; lastReward=elapsed; addFloat(floats,hip.x,hip.y-40,'+5','#A7F3D0',16); burst(parts,hip.x,hip.y,'#34D399',5); }
+    stepParticles(parts,dt); stepFloats(floats,dt);
+  };
+  const draw=(ctx)=>{
+    ctx.save(); ctx.translate(W/2,H/2); ctx.rotate(tilt*0.16);
+    ctx.strokeStyle='rgba(203,213,225,.9)'; ctx.lineWidth=6; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(-W/2+40,0); ctx.lineTo(W/2-40,0); ctx.stroke();
+    const s=1-tilt; ctx.strokeStyle=`rgba(16,185,129,${0.3+s*0.7})`; ctx.lineWidth=5; ctx.beginPath(); ctx.arc(0,0,30+s*30,0,6.2832); ctx.stroke();
+    ctx.shadowColor='#10B981'; ctx.shadowBlur=16; ctx.fillStyle='#10B981'; ctx.beginPath(); ctx.arc(0,-(30+s*30),10,0,6.2832); ctx.fill(); ctx.shadowBlur=0; ctx.restore();
+    frostPanel(ctx,W/2-150,20,300,38,19);
+    ctx.fillStyle= onOneLeg?'#D1FAE5':'#FDE68A'; ctx.font='700 15px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(onOneLeg?'单腿站立 · 保持静止':'请抬起一只脚 · 单腿站立',W/2,40); ctx.textBaseline='alphabetic';
+    drawParticles(ctx,parts); drawFloats(ctx,floats);
+  };
+  return {reset,update,draw,getScore:()=>score};
+}
+
+/* 7. 隔空摘星 —— 金色星星(稀有×3) */
+function makeStarGame(diff){
+  let star=null, parts=[], floats=[], score=0, starAge=0;
+  const newStar=()=>{ const corner=Math.floor(Math.random()*4); const golden=Math.random()<0.2; const x=corner%2===0?60+Math.random()*(W*0.28):W-60-Math.random()*(W*0.28); const y=30+Math.random()*(H*0.16/diff); star={x,y,r:golden?32:26,golden,phase:Math.random()*6.28}; };
+  const reset=()=>{ star=null; parts=[]; floats=[]; score=0; starAge=0; newStar(); };
+  const update=(lms,dt)=>{
+    const k=readKeypoints(); const hands=[]; if(k&&k.wrL)hands.push(k.wrL); if(k&&k.wrR)hands.push(k.wrR);
+    star.phase+=dt*3; starAge+=dt;
+    if(starAge>5){ score=deduct(score,floats,star.x,star.y,3); newStar(); starAge=0; }
+    for(const h of hands){ if(star && Math.hypot(h.x-star.x,h.y-star.y)<star.r+34){ const val=star.golden?60:20; score+=val; addFloat(floats,star.x,star.y,'+'+val, star.golden?'#FDE047':'#FDE047', star.golden?32:24); chime(star.golden?1240:920); burst(parts,star.x,star.y, star.golden?'#FDE047':'#FDE047', star.golden?40:30); newStar(); starAge=0; break; } }
+    stepParticles(parts,dt); stepFloats(floats,dt);
+  };
+  const draw=(ctx)=>{
+    if(!star) return;
+    const r=star.r*(1+Math.sin(star.phase)*0.12);
+    drawStar(ctx,star.x,star.y,5,r,r*0.5, star.golden?'#FDE047':'#FEF3C7', star.golden?'#F59E0B':'#F59E0B');
+    ctx.fillStyle='rgba(16,185,129,.10)'; ctx.fillRect(0,0,W,H*0.18);
+    ctx.strokeStyle='rgba(16,185,129,.4)'; ctx.setLineDash([8,8]); ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0,H*0.18); ctx.lineTo(W,H*0.18); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle='#94A3B8'; ctx.font='600 15px ui-monospace,Menlo,monospace'; ctx.textAlign='center'; ctx.fillText('伸高手臂 · 触碰星星(金色 ×3)',W/2,H*0.18-16);
+    drawParticles(ctx,parts); drawFloats(ctx,floats);
+  };
+  return {reset,update,draw,getScore:()=>score};
+}
+
+/* 8. 太极推手 —— 贴紧光球变亮变大 + 里程碑飘字 */
+function makeTaichiGame(diff){
+  let ball={x:W/2,y:H/2}, t=0, parts=[], floats=[], score=0, closeness=1, milestone=0, farTimer=0;
+  const reset=()=>{ ball={x:W/2,y:H/2}; t=0; parts=[]; floats=[]; score=0; closeness=1; milestone=0; farTimer=0; };
+  const update=(lms,dt)=>{
+    t+=dt;
+    ball.x=W/2+Math.sin(t*0.7*diff)*(W*0.34)+Math.sin(t*1.3*diff)*40;
+    ball.y=H/2+Math.cos(t*0.5*diff)*(H*0.26)+Math.sin(t*0.9*diff)*50;
+    const k=readKeypoints(); const hands=[]; if(k&&k.wrL)hands.push(k.wrL); if(k&&k.wrR)hands.push(k.wrR);
+    let best=Infinity; for(const h of hands) best=Math.min(best,Math.hypot(h.x-ball.x,h.y-ball.y));
+    closeness = best<130 ? 1-best/130 : 0;
+    if(best<130){ const gain=(1-best/130)*26*dt; score+=gain; if(Math.random()<0.5) burst(parts,ball.x+(Math.random()-.5)*20,ball.y+(Math.random()-.5)*20,'#6EE7B7',3); }
+    else if(best>220){ farTimer+=dt; if(farTimer>1.5){ farTimer=0; score=deduct(score,floats,ball.x,ball.y-60,2,'跟随丢失'); } }
+    else farTimer=0;
+    const m=Math.floor(score/50); if(m>milestone){ milestone=m; addFloat(floats,ball.x,ball.y-40,'跟随中 +50','#A7F3D0',20); chime(840); }
+    stepParticles(parts,dt); stepFloats(floats,dt);
+  };
+  const draw=(ctx)=>{
+    const rr=20+closeness*16, glowR=58+closeness*26;
+    const g=ctx.createRadialGradient(ball.x,ball.y,4,ball.x,ball.y,glowR);
+    g.addColorStop(0,`rgba(236,253,245,${0.6+closeness*0.4})`); g.addColorStop(.5,`rgba(52,211,153,${0.3+closeness*0.5})`); g.addColorStop(1,'rgba(52,211,153,0)');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(ball.x,ball.y,glowR,0,6.2832); ctx.fill();
+    ctx.fillStyle='#10B981'; ctx.beginPath(); ctx.arc(ball.x,ball.y,rr,0,6.2832); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.9)'; ctx.beginPath(); ctx.arc(ball.x-5,ball.y-6,rr*0.3,0,6.2832); ctx.fill();
+    ctx.strokeStyle='rgba(16,185,129,.5)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(ball.x,ball.y,rr+18,0,6.2832); ctx.stroke();
+    ctx.fillStyle='#94A3B8'; ctx.font='600 15px ui-monospace,Menlo,monospace'; ctx.textAlign='center'; ctx.fillText('双手跟随光球 · 越近光球越亮',W/2,40);
+    drawParticles(ctx,parts); drawFloats(ctx,floats);
+  };
+  return {reset,update,draw,getScore:()=>Math.round(score)};
+}
+
+/* 9. 左右滑步赛 —— 连击 */
+function makeSlideGame(diff){
+  let walls=[], parts=[], floats=[], score=0, spawn=1.2, combo=0;
+  const reset=()=>{ walls=[]; parts=[]; floats=[]; score=0; spawn=1.0; combo=0; };
+  const update=(lms,dt)=>{
+    const k=readKeypoints(); const hip=mid(k&&k.hipL,k&&k.hipR);
+    spawn-=dt;
+    if(spawn<=0){ const gapStart=60+Math.random()*(W-320); walls.push({y:-140,gapStart,gapEnd:gapStart+200,judged:false}); spawn=(1.4+Math.random()*0.5)/diff; }
+    for(const w of walls){
+      w.y+=170*diff*dt;
+      if(!w.judged && hip && w.y>hip.y-20 && w.y<hip.y+120){
+        w.judged=true;
+        if(hip.x>w.gapStart && hip.x<w.gapEnd){ score+=10; combo++; addFloat(floats,hip.x,hip.y-40,'+10','#A7F3D0',22); chime(700); burst(parts,hip.x,hip.y,'#34D399',26); comboBonus(combo,floats,parts,hip.x,hip.y-60); }
+        else { combo=0; score=deduct(score,floats,hip.x,hip.y,5); }
+      }
+    }
+    walls=walls.filter(w=>w.y<H+160); stepParticles(parts,dt); stepFloats(floats,dt);
+  };
+  const draw=(ctx)=>{
+    for(const w of walls){ const wallG=ctx.createLinearGradient(0,w.y,0,w.y+120); wallG.addColorStop(0,'rgba(30,41,59,.92)'); wallG.addColorStop(1,'rgba(15,23,42,.95)'); ctx.fillStyle=wallG; ctx.fillRect(0,w.y,w.gapStart,120); ctx.fillRect(w.gapEnd,w.y,W-w.gapEnd,120); ctx.strokeStyle='rgba(52,211,153,.65)'; ctx.lineWidth=2; ctx.strokeRect(w.gapStart,w.y,w.gapEnd-w.gapStart,120); ctx.fillStyle='rgba(52,211,153,.08)'; ctx.fillRect(w.gapStart,w.y,w.gapEnd-w.gapStart,120); ctx.strokeStyle='rgba(255,255,255,.25)'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(0,w.y+120); ctx.lineTo(W,w.y+120); ctx.stroke(); }
+    drawParticles(ctx,parts); drawFloats(ctx,floats);
+    if(combo>=2){ ctx.fillStyle='#A7F3D0'; ctx.font='800 20px ui-monospace,Menlo,monospace'; ctx.textAlign='center'; ctx.fillText('连击 ×'+combo,W/2,40); }
+  };
+  return {reset,update,draw,getScore:()=>score};
+}
+
+/* 10. 黑客躲闪 —— 连击 + 残影 */
+function makeDodgeGame(diff){
+  let score=0, parts=[], floats=[], ghosts=[], t=0, prevLaserX=W/2, laserX=W/2, combo=0; let cal=false, hipX0=0;
+  const reset=()=>{ score=0; parts=[], floats=[]; ghosts=[]; t=0; prevLaserX=W/2; laserX=W/2; combo=0; cal=false; };
+  const update=(lms,dt)=>{
+    t+=dt;
+    const k=readKeypoints(); const hip=mid(k&&k.hipL,k&&k.hipR); const sh=mid(k&&k.shL,k&&k.shR);
+    if(hip && !cal){ hipX0=hip.x; cal=true; }
+    prevLaserX=laserX; laserX=W/2+Math.sin(t*0.5*diff)*(W/2-70);
+    if(hip && sh && cal){
+      const hipMove=Math.abs(hip.x-hipX0); const lean=sh.x-hip.x; const crossing=(prevLaserX-hip.x)*(laserX-hip.x)<0;
+      if(crossing){
+        if(hipMove<34 && Math.abs(lean)>90){ score+=10; combo++; addFloat(floats,sh.x,sh.y-50,'+10','#A7F3D0',22); chime(840); burst(parts,sh.x,sh.y,'#A7F3D0',28); ghosts.push({x:sh.x,y:sh.y,life:0.5}); comboBonus(combo,floats,parts,sh.x,sh.y-70); }
+        else { combo=0; score=deduct(score,floats,sh.x,sh.y,5); }
+      }
+    }
+    for(const g of ghosts) g.life-=dt; ghosts=ghosts.filter(g=>g.life>0);
+    stepParticles(parts,dt); stepFloats(floats,dt);
+  };
+  const draw=(ctx)=>{
+    const g=ctx.createLinearGradient(laserX-16,0,laserX+16,0); g.addColorStop(0,'rgba(34,211,238,0)'); g.addColorStop(.5,'rgba(34,211,238,.7)'); g.addColorStop(1,'rgba(34,211,238,0)'); ctx.fillStyle=g; ctx.fillRect(laserX-16,0,32,H); ctx.fillStyle='rgba(165,243,252,.9)'; ctx.fillRect(laserX-2,0,4,H);
+    const k=readKeypoints(); const hip=mid(k&&k.hipL,k&&k.hipR);
+    if(hip){ ctx.fillStyle='rgba(16,185,129,.7)'; ctx.beginPath(); ctx.arc(hip.x,H-28,8,0,6.2832); ctx.fill(); ctx.strokeStyle='rgba(16,185,129,.4)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(hip.x-14,H-12); ctx.lineTo(hip.x,H-28); ctx.lineTo(hip.x+14,H-12); ctx.stroke(); }
+    for(const gh of ghosts){ ctx.strokeStyle=`rgba(103,232,249,${Math.max(0,gh.life/0.5)*0.6})`; ctx.lineWidth=4; ctx.beginPath(); ctx.arc(gh.x,gh.y,24,0,6.2832); ctx.stroke(); }
+    ctx.fillStyle='#94A3B8'; ctx.font='600 15px ui-monospace,Menlo,monospace'; ctx.textAlign='center'; ctx.fillText('脚下扎根不动 · 肩部侧屈躲激光',W/2,40);
+    drawParticles(ctx,parts); drawFloats(ctx,floats);
+    if(combo>=2){ ctx.fillStyle='#A7F3D0'; ctx.font='800 20px ui-monospace,Menlo,monospace'; ctx.textAlign='center'; ctx.fillText('连击 ×'+combo,W/2,72); }
+  };
+  return {reset,update,draw,getScore:()=>score};
+}
+
+/* =========================================================================
+ * 游戏数据（重新校准星级线）
+ * ========================================================================= */
+const STD={head:{x:.50,y:.10},shL:{x:.40,y:.20},shR:{x:.60,y:.20},elL:{x:.33,y:.34},elR:{x:.67,y:.34},wrL:{x:.35,y:.48},wrR:{x:.65,y:.48},hipL:{x:.43,y:.46},hipR:{x:.57,y:.46},knL:{x:.43,y:.66},knR:{x:.57,y:.66},anL:{x:.43,y:.86},anR:{x:.57,y:.86}};
+const GAMES=[
+  {id:'apple',icon:'🍎',title:'农场接苹果',train:'动态平衡',desc:'左右移动肩部，接住苹果，金色苹果价值更高。',dur:60,make:makeAppleGame,stars:[150,300,450],guideLabel:'双臂托举 · 左右移动接苹果',guide:{...STD,elL:{x:.40,y:.30},elR:{x:.60,y:.30},wrL:{x:.45,y:.28},wrR:{x:.55,y:.28}}},
+  {id:'ball',icon:'🛡️',title:'击退飞球',train:'上肢 ROM',desc:'用手腕护盾弹开飞球，连续弹中会爆炸。',dur:60,make:makeBallGame,stars:[40,80,120],guideLabel:'双臂平举 · 撑起护盾',guide:{...STD,elL:{x:.26,y:.20},elR:{x:.74,y:.20},wrL:{x:.16,y:.20},wrR:{x:.84,y:.20}}},
+  {id:'squat',icon:'🦆',title:'深蹲躲障碍',train:'下肢肌力',desc:'下蹲躲飞鸟，紫色大鸟分值翻倍。',dur:60,make:makeSquatGame,stars:[80,160,240],guideLabel:'屈膝下蹲 · 身体下沉躲飞鸟',guide:{...STD,head:{x:.5,y:.30},shL:{x:.40,y:.32},shR:{x:.60,y:.32},elL:{x:.30,y:.36},elR:{x:.70,y:.36},wrL:{x:.26,y:.40},wrR:{x:.74,y:.40},hipL:{x:.44,y:.60},hipR:{x:.56,y:.60},knL:{x:.40,y:.80},knR:{x:.60,y:.80},anL:{x:.44,y:.92},anR:{x:.56,y:.92}}},
+  {id:'rope',icon:'🤸',title:'原地跳绳',train:'心肺爆发力',desc:'连续跳跃触发连击，绳子越跳越快。',dur:60,make:makeRopeGame,stars:[120,240,360],guideLabel:'脚踝并拢 · 准备跳跃',guide:{...STD,elL:{x:.36,y:.34},elR:{x:.64,y:.34},wrL:{x:.38,y:.48},wrR:{x:.62,y:.48},anL:{x:.47,y:.86},anR:{x:.53,y:.86}}},
+  {id:'glass',icon:'🧽',title:'虚拟擦玻璃',train:'肩周全维度',desc:'手腕划过灰尘块，污渍逐渐擦净，消除 80% 过关。',dur:60,make:makeGlassGame,stars:[120,260,400],guideLabel:'双手抬至面前 · 准备擦玻璃',guide:{...STD,elL:{x:.34,y:.26},elR:{x:.66,y:.26},wrL:{x:.42,y:.22},wrR:{x:.58,y:.22}}},
+  {id:'balance',icon:'🪢',title:'高空走钢丝',train:'静态平衡',desc:'单腿站立保持静止，抖动会让屏幕倾斜。',dur:60,make:makeBalanceGame,stars:[150,300,450],guideLabel:'单腿站立 · 双臂平展',guide:{...STD,elL:{x:.26,y:.22},elR:{x:.74,y:.22},wrL:{x:.16,y:.22},wrR:{x:.84,y:.22},knL:{x:.46,y:.66},anL:{x:.46,y:.86},knR:{x:.58,y:.52},anR:{x:.66,y:.42}}},
+  {id:'star',icon:'⭐',title:'隔空摘星',train:'纵向伸展',desc:'伸高手臂摘星，金色星星分值三倍。',dur:60,make:makeStarGame,stars:[100,200,300],guideLabel:'双臂向上伸直 · 摘星',guide:{...STD,elL:{x:.42,y:.12},elR:{x:.58,y:.12},wrL:{x:.44,y:.03},wrR:{x:.56,y:.03}}},
+  {id:'taichi',icon:'☯️',title:'太极推手',train:'神经肌肉平顺',desc:'双手跟随光球，贴得越近光球越亮、得分越快。',dur:60,make:makeTaichiGame,stars:[300,600,900],guideLabel:'双手一前一后 · 跟随光球',guide:{...STD,elL:{x:.36,y:.26},elR:{x:.62,y:.34},wrL:{x:.30,y:.30},wrR:{x:.70,y:.42}}},
+  {id:'slide',icon:'🚪',title:'左右滑步赛',train:'髋外展',desc:'大幅迈步穿过墙缝，连续穿越触发连击。',dur:60,make:makeSlideGame,stars:[80,160,240],guideLabel:'双腿大幅分开 · 准备滑步',guide:{...STD,hipL:{x:.43,y:.50},hipR:{x:.57,y:.50},knL:{x:.32,y:.66},knR:{x:.68,y:.66},anL:{x:.28,y:.88},anR:{x:.72,y:.88},elL:{x:.28,y:.42},elR:{x:.72,y:.42},wrL:{x:.22,y:.52},wrR:{x:.78,y:.52}}},
+  {id:'dodge',icon:'🔦',title:'黑客躲闪',train:'核心稳定',desc:'髋部扎根，肩部侧屈躲激光，连续躲闪触发连击。',dur:60,make:makeDodgeGame,stars:[30,60,80],guideLabel:'髋部扎根 · 肩部侧屈',guide:{...STD,head:{x:.62,y:.14},shL:{x:.54,y:.20},shR:{x:.66,y:.20},elL:{x:.48,y:.34},elR:{x:.70,y:.34},wrL:{x:.50,y:.48},wrR:{x:.74,y:.48}}},
+];
+
+/* =========================================================================
+ * React 组件
+ * ========================================================================= */
+function RecordsModal({game,onClose}){
+  const records=gameRecords(game.id).slice().reverse();
+  const best=bestScore(game.id);
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <div className="modal-head"><span className="m-ico">{game.icon}</span><h3>{game.title} · 训练记录</h3><button className="modal-close" onClick={onClose}>✕</button></div>
+        {best ? (
+          <div className="best-banner">
+            <span className="trophy">🏆</span>
+            <div><div className="bb-label">历史最佳</div><div className="bb-score">{best.score}</div><div className="bb-meta">{best.difficulty==='hard'?'困难':'普通'} · {fmtDate(best.date)}</div></div>
+            <div className="stars" style={{fontSize:22,marginLeft:'auto',minWidth:86}}>{'★'.repeat(best.stars)}<span className="off">{'★'.repeat(3-best.stars)}</span></div>
+          </div>
+        ) : null}
+        <div className="rec-list">
+          {records.length===0 ? <div className="empty-rec">还没有记录<br/>快去玩一局，留下你的第一个成绩吧 💪</div> :
+          records.map((r,i)=>(
+            <div className="rec-item" key={i}>
+              <div className="ri-stars">{'★'.repeat(r.stars)}<span className="off">{'★'.repeat(3-r.stars)}</span></div>
+              <div className="ri-date">{fmtDate(r.date)}</div>
+              <span className={`ri-diff ${r.difficulty==='hard'?'hard':''}`}>{r.difficulty==='hard'?'困难':'普通'}</span>
+              <div className="ri-score">{r.score}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HomeMenu({onPlay,poseState,recTick}){
+  const gridRef=useRef(null);
+  const [bests,setBests]=useState({});
+  const [recGame,setRecGame]=useState(null);
+  useEffect(()=>{ const m={}; GAMES.forEach(g=>{ const b=bestScore(g.id); if(b) m[g.id]=b; }); setBests(m); },[recTick]);
+  const statusText = poseState==='ready'?'AI 体感已就绪':poseState==='error'?'摄像头未授权 · 请允许摄像头权限':'正在加载 AI 姿势模型…';
+  return (
+    <div className="home">
+      <div className="home-hero">
+        <span className="badge"><span className="dot"></span>基于 MediaPipe Pose · 无需穿戴设备</span>
+        <h1>AI 物理治疗与<br/><span className="grad">康复体感游戏平台</span></h1>
+        <p className="sub">Web-PT 用摄像头捕捉你的动作，把枯燥的康复训练变成 10 款可玩的体感游戏。正向激励为主，配合温和惩罚，激发你的训练动力。</p>
+        <div className={`status-pill ${poseState}`}>{poseState==='loading' && <span className="spinner"></span>}<span className="s-dot"></span>{statusText}</div>
+        <div className="stat-wall">
+          <div className="stat"><div className="num">10</div><div className="label">体感游戏</div></div>
+          <div className="stat"><div className="num">33</div><div className="label">骨骼关键点</div></div>
+          <div className="stat"><div className="num">10</div><div className="label">康复维度</div></div>
+          <div className="stat"><div className="num">0</div><div className="label">穿戴设备</div></div>
+        </div>
+        <div className="hero-cta">
+          <button className="primary-btn" onClick={()=>gridRef.current&&gridRef.current.scrollIntoView({behavior:'smooth',block:'start'})}>开始体验 ↓</button>
+        </div>
+      </div>
+      <div className="grid" ref={gridRef}>
+        {GAMES.map((g,i)=>(
+          <div key={g.id} className="game-card" onClick={()=>onPlay(g)} role="button" tabIndex={0} onKeyDown={e=>{ if(e.key==='Enter') onPlay(g); }}>
+            <button className="rec-btn" title="查看记录" onClick={e=>{ e.stopPropagation(); setRecGame(g); }}>📊</button>
+            {i===0 && <span className="rec-tag">推荐入门</span>}
+            <span className="ico">{g.icon}</span>
+            <h3>{g.title}</h3>
+            <span className="train">练 · {g.train}</span>
+            <p>{g.desc}</p>
+            <div className="meta"><span>NO.{String(i+1).padStart(2,'0')}</span><span className="best">{bests[g.id] ? `最佳 ${bests[g.id].score}` : '尚无记录'}</span></div>
+          </div>
+        ))}
+      </div>
+      <p className="hint-tip">⚠️ 使用前请站在摄像头前、全身入镜，保持充足光照与 1.5–3 米距离。本工具仅供康复训练辅助，不替代专业诊疗意见。</p>
+      {recGame && <RecordsModal game={recGame} onClose={()=>setRecGame(null)} />}
+    </div>
+  );
+}
+
+function GameShell({game,onExit}){
+  const canvasRef=useRef(null);
+  const gameRef=useRef(null);
+  const pausedRef=useRef(false);
+  const accRef=useRef(0);
+  const [phase,setPhase]=useState('ready');
+  const [count,setCount]=useState(3);
+  const [score,setScore]=useState(0);
+  const [finalScore,setFinalScore]=useState(0);
+  const [stars,setStars]=useState(0);
+  const [newRecord,setNewRecord]=useState(false);
+  const [noPerson,setNoPerson]=useState(false);
+  const [difficulty,setDifficulty]=useState('normal');
+  const [paused,setPaused]=useState(false);
+  const [remaining,setRemaining]=useState(game.dur);
+  const scoreRef=useRef(0);
+  const remainRef=useRef(game.dur);
+
+  const dur = difficulty==='hard' ? Math.round(game.dur*1.5) : game.dur;
+  const diffVal = difficulty==='hard' ? 1.35 : 1;
+
+  useEffect(()=>{ setRemaining(dur); },[difficulty]);
+
+  useEffect(()=>{ if(phase!=='countdown') return; setCount(3); let c=3; const iv=setInterval(()=>{ c--; if(c<=0){ clearInterval(iv); setPhase('playing'); } else setCount(c); },1000); return ()=>clearInterval(iv); },[phase]);
+  useEffect(()=>{ const iv=setInterval(()=>setNoPerson(!personDetected),300); return ()=>clearInterval(iv); },[]);
+
+  const togglePause=()=>{ pausedRef.current=!pausedRef.current; setPaused(pausedRef.current); };
+  useEffect(()=>{ const h=e=>{ if(e.code==='Space' && phase==='playing'){ e.preventDefault(); togglePause(); } }; window.addEventListener('keydown',h); return ()=>window.removeEventListener('keydown',h); },[phase]);
+
+  useEffect(()=>{
+    if(phase!=='ready' && phase!=='countdown') return;
+    const canvas=canvasRef.current; if(!canvas) return;
+    const ctx=canvas.getContext('2d'); const video=document.getElementById('input-video');
+    let raf=0;
+    const loop=()=>{ ctx.clearRect(0,0,W,H); if(personDetected){ drawCamera(ctx,video); drawSkeleton(ctx); } drawAmbient(ctx,performance.now()/1000); drawPoseGuide(ctx,game.guide,game.guideLabel); raf=requestAnimationFrame(loop); };
+    raf=requestAnimationFrame(loop);
+    return ()=>cancelAnimationFrame(raf);
+  },[phase]);
+
+  useEffect(()=>{
+    if(phase!=='playing') return;
+    const canvas=canvasRef.current; if(!canvas) return;
+    const ctx=canvas.getContext('2d');
+    const g=game.make(diffVal); gameRef.current=g; g.reset();
+    scoreRef.current=0; remainRef.current=dur; accRef.current=0; pausedRef.current=false; setPaused(false);
+    const video=document.getElementById('input-video');
+    let raf=0, last=performance.now();
+    const finish=()=>{ const sc=scoreRef.current; const st=calcStars(game,sc,difficulty); const prev=bestScore(game.id); const isNew=!prev || sc>prev.score; saveRecord(game.id,{score:sc,stars:st,difficulty,duration:dur,date:Date.now()}); setFinalScore(sc); setStars(st); setNewRecord(isNew); setPhase('done'); };
+    const loop=(now)=>{
+      const frameDt=Math.min(0.05,(now-last)/1000); last=now;
+      if(!pausedRef.current){
+        accRef.current+=frameDt; const elapsed=accRef.current;
+        ctx.clearRect(0,0,W,H);
+        if(personDetected){ drawCamera(ctx,video); drawSkeleton(ctx); }
+        drawAmbient(ctx,now/1000);
+        if(personDetected) g.update(poseLandmarks,frameDt,now,elapsed);
+        g.draw(ctx);
+        scoreRef.current=g.getScore(); remainRef.current=Math.max(0,dur-elapsed);
+        if(g.win && g.win()){ finish(); return; }
+        if(elapsed>=dur){ finish(); return; }
+      }
+      raf=requestAnimationFrame(loop);
+    };
+    raf=requestAnimationFrame(loop);
+    return ()=>cancelAnimationFrame(raf);
+  },[phase]);
+
+  useEffect(()=>{ if(phase!=='playing') return; const iv=setInterval(()=>{ setScore(scoreRef.current); setRemaining(Math.ceil(remainRef.current)); },200); return ()=>clearInterval(iv); },[phase]);
+
+  const startGame=()=>setPhase('countdown');
+  const retry=()=>{ setFinalScore(0); setStars(0); setNewRecord(false); setScore(0); setRemaining(dur); setPhase('countdown'); };
+  const exitToHome=()=>{ pausedRef.current=false; onExit(); };
+
+  return (
+    <div className="game-page">
+      <div className="topbar">
+        <button className="back-btn" onClick={exitToHome}>← 返回</button>
+        <div className="title-wrap"><h2>{game.icon} {game.title}</h2><span>练 · {game.train} · {difficulty==='hard'?'困难':'普通'} {dur}s</span></div>
+        {phase==='playing' && <button className="pause-btn" onClick={togglePause} title="暂停/继续（空格）">{paused?'▶':'⏸'}</button>}
+        <div className="hud">
+          <div className="chip score"><div className="k">得分</div><div className="v">{score}</div></div>
+          <div className="chip"><div className="k">剩余</div><div className="v">{remaining}s</div></div>
+        </div>
+      </div>
+      <div className="stage">
+        <canvas ref={canvasRef} width={W} height={H}></canvas>
+        {phase==='ready' && (
+          <div className="overlay guide">
+            <div className="big-title">{game.icon} {game.title}</div>
+            <div style={{flex:1}}></div>
+            <div className="diff-row">
+              <button className={`diff-btn ${difficulty==='normal'?'active':''}`} onClick={()=>setDifficulty('normal')}>普通<span>{game.dur}s</span></button>
+              <button className={`diff-btn ${difficulty==='hard'?'active':''}`} onClick={()=>setDifficulty('hard')}>困难<span>{Math.round(game.dur*1.5)}s</span></button>
+            </div>
+            <p className="desc" style={{color:'#D1FAE5',textShadow:'0 1px 8px rgba(0,0,0,.6)'}}>{game.desc}</p>
+            <button className="primary-btn" onClick={startGame}>开始训练</button>
+          </div>
+        )}
+        {phase==='countdown' && (
+          <div className="overlay count">
+            <div className="countdown-num">{count}</div>
+            <p className="desc" style={{color:'#D1FAE5',textShadow:'0 1px 8px rgba(0,0,0,.6)'}}>请保持上方姿势 · 全身入镜</p>
+          </div>
+        )}
+        {phase==='playing' && paused && (
+          <div className="overlay dark" style={{background:'rgba(2,6,23,.86)'}}>
+            <div className="big-title">⏸ 已暂停</div>
+            <p className="desc" style={{color:'#94A3B8'}}>当前得分 {score}</p>
+            <div className="btn-row"><button className="primary-btn" onClick={togglePause}>继续训练</button><button className="ghost-btn" onClick={exitToHome}>退出本局</button></div>
+          </div>
+        )}
+        {phase==='done' && (
+          <div className="overlay dark">
+            <div className="big-title">🎉 训练完成</div>
+            <div className="stars">{'★'.repeat(stars)}<span className="off">{'★'.repeat(3-stars)}</span></div>
+            <div className="rating-text">{RATING_TEXT[stars]}</div>
+            <div className="score-final">{finalScore}</div>
+            <p className="desc" style={{color:'#94A3B8'}}>{difficulty==='hard'?'困难':'普通'}模式 · 得分</p>
+            {newRecord && <div className="new-record">🏆 新纪录！历史最佳</div>}
+            <div className="btn-row"><button className="primary-btn" onClick={retry}>再来一次</button><button className="ghost-btn" onClick={exitToHome}>返回首页</button></div>
+          </div>
+        )}
+        {(phase==='countdown' || phase==='playing') && noPerson && !paused && (
+          <div className="overlay dark" style={{background:'rgba(0,0,0,.96)'}}>
+            <div className="no-person"><span className="warn">⚠️</span>未检测到人体，请全身入镜</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================================
+ * 顶部导航 & 学术内容页
+ * ========================================================================= */
+function NaviBar({page,setPage,poseState}){
+  const items=[{id:'games',label:'开始训练'},{id:'dash',label:'训练数据'},{id:'about',label:'项目背景'},{id:'tech',label:'技术原理'},{id:'system',label:'系统设计'},{id:'refs',label:'参考文献'}];
+  return (
+    <nav className="nav">
+      <div className="nav-inner">
+        <span className="nav-logo" onClick={()=>setPage('games')}>💪 Web-<span className="pt">PT</span></span>
+        <div className="nav-links">{items.map(it=>(<button key={it.id} className={`nav-link ${page===it.id?'active':''}`} onClick={()=>setPage(it.id)}>{it.label}</button>))}</div>
+        <span className={`status-pill mini ${poseState}`}><span className="s-dot"></span></span>
+      </div>
+    </nav>
+  );
+}
+const Section=({title,children})=>(<section className="section"><h2>{title}</h2>{children}</section>);
+
+function AboutPage(){
+  return (
+    <div className="content-page">
+      <div className="content-hero"><h1>项目背景</h1><p>为什么需要一个基于摄像头、无需穿戴设备的 AI 康复体感游戏平台。</p></div>
+      <Section title="研究背景">
+        <p>全球人口老龄化持续加深,脑卒中、骨关节炎、运动损伤等疾病导致的运动功能障碍患者数量逐年上升。康复医学强调「早期介入、主动参与、重复强化、及时反馈」,这一过程高度依赖康复治疗师的一对一指导。</p>
+        <p>然而,专业康复资源稀缺、成本高昂,且多集中于大型医疗机构。大量患者在急性期治疗结束后回到家中,却难以获得持续、规范的康复训练——居家康复的低依从性,是康复效果打折扣的关键原因之一。</p>
+      </Section>
+      <Section title="核心痛点">
+        <ul>
+          <li><strong>可及性差：</strong>往返医院耗时耗力,偏远地区与行动不便者更难获得专业指导。</li>
+          <li><strong>训练枯燥：</strong>重复性动作缺乏趣味与即时反馈,患者难以长期坚持。</li>
+          <li><strong>缺少量化：</strong>居家训练缺乏客观的动作评估,治疗师无法远程掌握进展。</li>
+          <li><strong>设备门槛：</strong>传统动作捕捉依赖穿戴传感器或深度相机,成本高、部署难。</li>
+        </ul>
+      </Section>
+      <Section title="行业趋势">
+        <p>数字疗法(Digital Therapeutics, DTx)与远程康复(telerehabilitation)正在兴起。计算机视觉与人体姿态估计技术日趋成熟,使「普通摄像头 + 浏览器」即可实现无标记、无穿戴的动作捕捉。体感游戏(exergame)被多项研究证实能显著提升康复训练的趣味性与依从性。</p>
+        <p>以 MediaPipe Pose 为代表的开源框架,可在普通消费级硬件上实时输出 33 个骨骼关键点;相关康复系统的动作识别准确率普遍达到 91%–99%,为低成本居家康复提供了技术可行性。</p>
+      </Section>
+      <Section title="本项目定位">
+        <div className="info-card"><h3>Web-PT · AI 物理治疗与康复体感游戏平台</h3><p style={{margin:0}}>一个纯浏览器运行、无需任何穿戴设备的康复体感游戏平台。用户仅需普通摄像头即可开始训练,系统实时捕捉人体姿态,以游戏化方式引导用户完成康复动作,并提供即时正向反馈与温和的失败惩罚。</p></div>
+        <p>平台内置 10 款体感游戏,分别针对 <strong>动态平衡、上肢关节活动度(ROM)、下肢肌力、心肺爆发力、肩周全维度活动、静态平衡、纵向伸展、神经肌肉平顺性、髋外展、核心稳定性</strong> 十大康复维度设计。</p>
+      </Section>
+    </div>
+  );
+}
+
+function KeypointFigure(){
+  const P=(x,y)=>({x:x*300,y:y*400});
+  const pts={head:P(.5,.08),shL:P(.40,.18),shR:P(.60,.18),elL:P(.33,.30),elR:P(.67,.30),wrL:P(.35,.42),wrR:P(.65,.42),hipL:P(.43,.44),hipR:P(.57,.44),knL:P(.43,.62),knR:P(.57,.62),anL:P(.43,.80),anR:P(.57,.80)};
+  const lines=[['head','shL'],['head','shR'],['shL','shR'],['shL','elL'],['elL','wrL'],['shR','elR'],['elR','wrR'],['shL','hipL'],['shR','hipR'],['hipL','hipR'],['hipL','knL'],['knL','anL'],['hipR','knR'],['knR','anR']];
+  const labels={shL:'11',shR:'12',wrL:'15',wrR:'16',hipL:'23',hipR:'24',anL:'27',anR:'28'};
+  const colors={shL:'#10B981',shR:'#10B981',wrL:'#3B82F6',wrR:'#3B82F6',hipL:'#F59E0B',hipR:'#F59E0B',anL:'#8B5CF6',anR:'#8B5CF6'};
+  return (
+    <div className="keypoint-svg">
+      <svg viewBox="0 0 300 400" style={{width:'100%',maxWidth:330,display:'block',margin:'0 auto'}}>
+        {lines.map(([a,b],i)=>(<line key={i} x1={pts[a].x} y1={pts[a].y} x2={pts[b].x} y2={pts[b].y} stroke="#CBD5E1" strokeWidth="3" strokeLinecap="round"/>))}
+        <circle cx={pts.head.x} cy={pts.head.y} r="18" fill="#CBD5E1"/>
+        {Object.keys(pts).filter(k=>k!=='head').map(k=>(<circle key={k} cx={pts[k].x} cy={pts[k].y} r="7" fill={colors[k]||'#CBD5E1'}/>))}
+        {Object.keys(labels).map(k=>(<text key={k} x={pts[k].x+(k.endsWith('L')?-16:14)} y={pts[k].y-12} fontSize="13" fontFamily="ui-monospace,Menlo,monospace" fontWeight="700" fill={colors[k]}>{labels[k]}</text>))}
+      </svg>
+      <div className="legend">
+        <span className="lg"><span className="sw" style={{background:'#10B981'}}></span>肩 11/12 · 动态平衡、核心稳定</span>
+        <span className="lg"><span className="sw" style={{background:'#3B82F6'}}></span>腕 15/16 · 上肢ROM、肩周、伸展</span>
+        <span className="lg"><span className="sw" style={{background:'#F59E0B'}}></span>髋 23/24 · 下肢肌力、平衡、髋外展</span>
+        <span className="lg"><span className="sw" style={{background:'#8B5CF6'}}></span>踝 27/28 · 心肺爆发力</span>
+      </div>
+    </div>
+  );
+}
+const ALGO_ROWS=[
+  ['农场接苹果','肩 11 / 12','肩中心点 X 轴平移控制篮子接苹果'],
+  ['击退飞球','腕 15 / 16','手腕护盾弹开小球,3 次碰撞后爆炸'],
+  ['深蹲躲障碍','髋 23 / 24','髋部 Y 轴下降 >15% 判定深蹲躲飞鸟'],
+  ['原地跳绳','踝 27 / 28','脚踝抬高越过旋转的虚拟绳'],
+  ['虚拟擦玻璃','腕 15 / 16','手腕划过灰尘块,消除 80% 过关'],
+  ['高空走钢丝','髋 23 / 24 + 踝 27/28','单腿站立 + 3 秒髋 X 抖动检测'],
+  ['隔空摘星','腕 15 / 16','手腕触碰屏幕顶端区域摘星'],
+  ['太极推手','腕 15 / 16','手腕跟随正弦光球,距离越近得分越高'],
+  ['左右滑步赛','髋 23 / 24','髋部 X 轴大幅位移穿过墙壁缝隙'],
+  ['黑客躲闪','肩 11/12 + 髋 23/24','髋 X 扎根不动,肩 X 侧屈躲激光'],
+];
+function TechPage(){
+  return (
+    <div className="content-page">
+      <div className="content-hero"><h1>技术原理</h1><p>基于 MediaPipe Pose 的人体姿态估计与动作判定方法。</p></div>
+      <Section title="MediaPipe Pose">
+        <p>MediaPipe Pose 是 Google 开源的实时人体姿态估计框架,在单目 RGB 摄像头下即可输出 <strong>33 个骨骼关键点</strong>的坐标与可见度。其计算延迟低、对普通消费级硬件友好,已被广泛用于步态分析、关节活动度评估、姿态矫正与远程康复等场景。</p>
+        <p>多项研究评估显示,基于 MediaPipe 的康复动作识别准确率普遍在 <strong>91%–99%</strong> 之间,关节角度测量误差在部分研究中低于 6°,能够满足社区与居家康复的筛查和训练需求。</p>
+      </Section>
+      <Section title="本平台用到的关键点"><p>平台仅依赖以下 8 个关键点即可驱动全部 10 款游戏,降低遮挡带来的不稳定:</p><KeypointFigure/></Section>
+      <Section title="动作判定流程">
+        <div className="flow">
+          {['摄像头采集画面 (getUserMedia)','MediaPipe Pose 推理,输出 33 个关键点归一化坐标','镜像映射 + 可见度过滤,提取目标关键点','基于运动学规则与阈值判定动作(如髋部下降 15%)','驱动 Canvas 游戏逻辑,产生正向反馈(得分/粒子/音效)','成绩写入本地记录 (localStorage)'].map((s,i)=>(<div className="flow-step" key={i}><div className="fs-dot">{i+1}</div><div className="fs-body"><span>{s}</span></div></div>))}
+        </div>
+      </Section>
+      <Section title="十款游戏的判定算法">
+        <div className="table-wrap"><table><thead><tr><th>游戏</th><th>关键点</th><th>判定指标</th></tr></thead><tbody>{ALGO_ROWS.map((r,i)=>(<tr key={i}><td><strong>{r[0]}</strong></td><td><span className="lm">{r[1]}</span></td><td>{r[2]}</td></tr>))}</tbody></table></div>
+      </Section>
+    </div>
+  );
+}
+
+const DIM_ROWS=[
+  ['动态平衡','农场接苹果','肩 11 / 12'],['上肢关节活动度 (ROM)','击退飞球','腕 15 / 16'],['下肢肌力','深蹲躲障碍','髋 23 / 24'],['心肺爆发力','原地跳绳','踝 27 / 28'],['肩周全维度活动','虚拟擦玻璃','腕 15 / 16'],['静态平衡','高空走钢丝','髋 23 / 24 + 踝 27/28'],['纵向伸展','隔空摘星','腕 15 / 16'],['神经肌肉平顺性','太极推手','腕 15 / 16'],['髋外展','左右滑步赛','髋 23 / 24'],['核心稳定性','黑客躲闪','肩 11/12 + 髋 23/24'],
+];
+function SystemPage(){
+  return (
+    <div className="content-page">
+      <div className="content-hero"><h1>系统设计</h1><p>从摄像头到游戏反馈的完整数据流与设计原则。</p></div>
+      <Section title="系统架构">
+        <div className="flow">{['摄像头(普通 RGB 摄像头)','getUserMedia 采集视频流','MediaPipe Pose(wasm)实时推理,约 30 FPS','33 个关键点 + 可见度','React UI + Canvas 游戏逻辑','反馈(得分/粒子/音效/惩罚)','训练记录(localStorage 本地存储)'].map((s,i)=>(<div className="flow-step" key={i}><div className="fs-dot">{i+1}</div><div className="fs-body"><span>{s}</span></div></div>))}</div>
+        <div className="arch">
+          <div className="arch-layer"><div className="arch-label">表现层</div><div className="arch-boxes"><span>React UI</span><span>Canvas 游戏画面</span><span>HUD / 菜单</span></div></div>
+          <div className="arch-arrow">↓</div>
+          <div className="arch-layer infer"><div className="arch-label">推理层</div><div className="arch-boxes"><span>MediaPipe Pose (WASM)</span><span>33 关键点</span><span>动作判定规则</span></div></div>
+          <div className="arch-arrow">↓</div>
+          <div className="arch-layer"><div className="arch-label">数据层</div><div className="arch-boxes"><span>localStorage</span><span>训练记录</span><span>星级评分</span></div></div>
+        </div>
+      </Section>
+      <Section title="设计原则">
+        <ul>
+          <li><strong>正向激励 + 温和惩罚：</strong>以得分、粒子、连击为主的正向反馈,辅以失败扣分与连击中断的成本,激发好胜心;但克制惩罚——不扣至负分、不用刺耳音效,避免过度挫败。</li>
+          <li><strong>防丢机制：</strong>实时展示 30% 透明度的摄像头画面与绿色骨架连线;未检测到人体时全屏提示「未检测到人体,请全身入镜」。</li>
+          <li><strong>隐私优先：</strong>视频流仅在本地浏览器内处理,不采集、不上传任何影像数据。</li>
+          <li><strong>低门槛：</strong>无需穿戴设备或专用传感器,普通摄像头 + 现代浏览器即可运行。</li>
+          <li><strong>可量化：</strong>每次训练自动记录得分、星级、难度与时间,支持回顾历史表现。</li>
+        </ul>
+      </Section>
+      <Section title="康复维度 ↔ 游戏对照">
+        <div className="table-wrap"><table><thead><tr><th>训练维度</th><th>对应游戏</th><th>关键点</th></tr></thead><tbody>{DIM_ROWS.map((r,i)=>(<tr key={i}><td><strong>{r[0]}</strong></td><td>{r[1]}</td><td><span className="lm">{r[2]}</span></td></tr>))}</tbody></table></div>
+      </Section>
+      <Section title="局限与展望">
+        <p>受单目 RGB 摄像头限制,系统在深度信息、遮挡场景与画面外的动作上存在固有误差,目前定位于康复训练的辅助与筛查,而非精确的运动学测量。后续可引入多视角融合、动作质量评分模型与治疗师远程随访模块,并开展临床有效性验证。</p>
+      </Section>
+    </div>
+  );
+}
+
+const REF_GROUPS=[
+  {title:'A. MediaPipe 物理治疗系统', refs:[
+    {t:'Towards an Accessible Smart Physiotherapy Assistant: A Real-Time Pose Estimation Framework', s:'IEEE (2025)', u:'https://ieeexplore.ieee.org/document/11378935'},
+    {t:'Accuracy Assessment of 2D Pose Estimation with MediaPipe for Physiotherapy Exercises', s:'Procedia Computer Science (ScienceDirect)', u:'https://www.sciencedirect.com/science/article/pii/S1877050924033660'},
+    {t:'Design of a Home-Based Rehabilitation System for Older Adults With Early-Stage KOA Based on Vision-Based Pose Estimation and Digital Avatars', s:'IEEE', u:'https://ieeexplore.ieee.org/document/11592368'},
+    {t:'Transforming Upper Limb Rehabilitation: RealTime, Holistic Feedback Using Python and Sensor Fusion', s:'IEEE', u:'https://ieeexplore.ieee.org/document/11380887'},
+  ]},
+  {title:'B. 体感游戏(exergame)与康复', refs:[
+    {t:'Low-Cost Vision-Based 3-D Elbow Tracking for Post-Stroke Rehabilitation: Development and Pilot Evaluation of a Serious Game', s:'IEEE', u:'https://ieeexplore.ieee.org/iel8/7333/10806469/11087653.pdf'},
+    {t:'Digital monitoring of motor function in Parkinson’s disease using Markerless motion analysis and exergaming', s:'Frontiers in Neurology', u:'https://doaj.org/article/032b388c0b0140dbbeab30af0ce8f5bc'},
+    {t:'Application of Deep Learning-Based Markerless Pose Estimation in a 3D Exergame System for Knee Osteoarthritis Exercise Management', s:'Sensors', u:'https://doi.org/10.3390/s26185857'},
+  ]},
+  {title:'C. 综述(用于引言与相关工作)', refs:[
+    {t:'Advancements in markerless motion capture systems for upper limb functional assessment in stroke rehabilitation: A comprehensive review', s:'SAGE Digital Health', u:'https://journals.sagepub.com/doi/full/10.1177/20552076251412636'},
+    {t:'A Narrative Review on AI-assisted Clinical Decision Support System in Physiotherapy Practice: Computer Vision-based Posture Assessment and its Clinical Validation', s:'JCDR', u:'https://doaj.org/article/993131c2003e4cf7af5448ce005db6f6'},
+    {t:'Towards remote rehabilitation with gaming, digital monitor and computer vision technologies', s:'ACM', u:'https://dl.acm.org/doi/10.1145/3665318.3677162'},
+  ]},
+];
+function RefsPage(){
+  return (
+    <div className="content-page">
+      <div className="content-hero"><h1>参考文献</h1><p>本平台设计与可行性论证所参考的学术文献,可直接用于论文引用。</p></div>
+      {REF_GROUPS.map((g,i)=>(<div className="ref-group" key={i}><h3>{g.title}</h3>{g.refs.map((r,j)=>(<div className="ref-item" key={j}><span className="ref-idx">[{j+1}]</span><div className="ref-body"><div className="ref-title"><a href={r.u} target="_blank" rel="noopener noreferrer">{r.t}</a></div><div className="ref-src">{r.s}</div></div></div>))}</div>))}
+    </div>
+  );
+}
+
+/* ---------- 页脚 ---------- */
+function Footer(){
+  return (
+    <footer className="footer">
+      <div className="footer-inner">
+        <span className="f-brand">💪 Web-PT</span>
+        <span className="f-meta">AI 物理治疗与康复体感游戏平台 · 基于 MediaPipe Pose</span>
+        <span className="f-version">v1.0</span>
+        <span className="f-author">作者：DINGPEIZHE</span>
+      </div>
+    </footer>
+  );
+}
+
+/* ---------- 训练数据仪表盘 ---------- */
+function computeStats(){
+  const all=loadRecords();
+  let totalGames=0, totalSeconds=0, totalStars=0, starCount=0, bestOverall=0;
+  const perGame={}; const daily={}; const dims={};
+  GAMES.forEach(g=>{ perGame[g.id]={title:g.title,train:g.train,best:0,count:0}; dims[g.train]=0; });
+  for(const gid in all){
+    const list=all[gid]; if(!perGame[gid]) continue;
+    let best=0;
+    for(const r of list){
+      totalGames++; totalSeconds+=(r.duration||60); starCount++; totalStars+=(r.stars||0);
+      if(r.score>best) best=r.score;
+      if(r.score>bestOverall) bestOverall=r.score;
+      const d=new Date(r.date); const key=`${d.getMonth()+1}/${d.getDate()}`; daily[key]=(daily[key]||0)+1;
+    }
+    perGame[gid].best=best; perGame[gid].count=list.length;
+    const game=GAMES.find(g=>g.id===gid);
+    if(game){ const m=Math.max(0,...list.map(r=>r.stars||0)); dims[game.train]=Math.max(dims[game.train]||0,m); }
+  }
+  return { totalGames, totalMinutes:Math.round(totalSeconds/60), avgStars: starCount?(totalStars/starCount).toFixed(1):'0.0', bestOverall, perGame, daily, dims };
+}
+
+function Dashboard(){
+  const stats=useMemo(()=>computeStats(),[]);
+  const barRef=useRef(null), lineRef=useRef(null), radarRef=useRef(null);
+  const charts=useRef([]);
+  useEffect(()=>{
+    if(stats.totalGames===0 || !window.Chart) return;
+    charts.current.forEach(c=>c.destroy()); charts.current=[];
+    const font={family:'-apple-system,"PingFang SC","Microsoft YaHei",sans-serif'};
+    // 柱状图：各游戏最佳成绩
+    charts.current.push(new Chart(barRef.current,{
+      type:'bar',
+      data:{labels:GAMES.map(g=>g.title),datasets:[{label:'最佳得分',data:GAMES.map(g=>stats.perGame[g.id].best),backgroundColor:GAMES.map((g,i)=>i%2?'rgba(16,185,129,0.5)':'rgba(16,185,129,0.85)'),borderRadius:6,maxBarThickness:36}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'#E2E8F0'}},x:{grid:{display:false},ticks:{font,maxRotation:45,minRotation:45}}}}
+    }));
+    // 折线图：训练次数趋势
+    const days=Object.keys(stats.daily).sort((a,b)=>{ const [ma,da]=a.split('/').map(Number),[mb,db]=b.split('/').map(Number); return ma-mb||da-db; });
+    charts.current.push(new Chart(lineRef.current,{
+      type:'line',
+      data:{labels:days,datasets:[{label:'训练次数',data:days.map(d=>stats.daily[d]),borderColor:'#0EA5E9',backgroundColor:'rgba(14,165,233,0.12)',fill:true,tension:0.4,pointBackgroundColor:'#0EA5E9',pointRadius:4}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1},grid:{color:'#E2E8F0'}},x:{grid:{display:false}}}}}
+    }));
+    // 雷达图：康复维度覆盖（最佳星级 0-3）
+    charts.current.push(new Chart(radarRef.current,{
+      type:'radar',
+      data:{labels:GAMES.map(g=>g.train),datasets:[{label:'最佳星级',data:GAMES.map(g=>stats.dims[g.train]),backgroundColor:'rgba(16,185,129,0.18)',borderColor:'#10B981',borderWidth:2,pointBackgroundColor:'#10B981',pointRadius:3}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{r:{min:0,max:3,ticks:{stepSize:1,backdropColor:'transparent',font:{size:10}},grid:{color:'#E2E8F0'},angleLines:{color:'#E2E8F0'},pointLabels:{font:{size:11}}}}}
+    }));
+    return ()=>{ charts.current.forEach(c=>c.destroy()); };
+  },[stats]);
+  return (
+    <div className="content-page">
+      <div className="content-hero"><h1>训练数据</h1><p>你的康复训练全景统计,每一局都被记录下来。</p></div>
+      {stats.totalGames===0 ? (
+        <div className="dash-empty">还没有训练数据<br/>先去玩一局,这里会自动生成你的专属图表 📊</div>
+      ) : (
+        <div>
+          <div className="dash-grid">
+            <div className="dash-card"><div className="d-num">{stats.totalGames}</div><div className="d-label">累计训练次数</div></div>
+            <div className="dash-card"><div className="d-num">{stats.totalMinutes}</div><div className="d-label">累计时长(分钟)</div></div>
+            <div className="dash-card"><div className="d-num">{stats.avgStars}</div><div className="d-label">平均星级</div></div>
+            <div className="dash-card"><div className="d-num">{stats.bestOverall}</div><div className="d-label">历史最高分</div></div>
+          </div>
+          <div className="chart-card"><h3>各游戏最佳成绩</h3><div className="chart-box"><canvas ref={barRef}></canvas></div></div>
+          <div className="chart-card"><h3>训练次数趋势</h3><div className="chart-box"><canvas ref={lineRef}></canvas></div></div>
+          <div className="chart-card"><h3>康复维度覆盖(最佳星级)</h3><div className="chart-box"><canvas ref={radarRef}></canvas></div></div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function App(){
+  const [page,setPage]=useState('games');
+  const [current,setCurrent]=useState(null);
+  const [poseState,setPoseState]=useState('loading');
+  const [recTick,setRecTick]=useState(0);
+  useEffect(()=>{ startPose(setPoseState); },[]);
+  if(current) return <GameShell game={current} onExit={()=>{ setCurrent(null); setRecTick(t=>t+1); }} />;
+  const pages={ games:<HomeMenu onPlay={setCurrent} poseState={poseState} recTick={recTick} />, dash:<Dashboard/>, about:<AboutPage/>, tech:<TechPage/>, system:<SystemPage/>, refs:<RefsPage/> };
+  return (<div><NaviBar page={page} setPage={setPage} poseState={poseState}/>{pages[page]}<Footer/></div>);
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
